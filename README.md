@@ -1,6 +1,6 @@
 # 🚀 Psychedelic River Raid
 
-Um jogo inspirado no clássico River Raid com gráficos psicodélicos e geração procedural de níveis!
+Um jogo inspirado no clássico River Raid com gráficos psicodélicos, geração procedural e explosões épicas!
 
 ## 🎮 Sobre o Jogo
 
@@ -9,7 +9,10 @@ Este é um jogo de nave espacial estilo arcade onde você pilota uma nave atrav�
 - **Gráficos Psicodélicos**: Cores vibrantes que mudam constantemente, efeitos visuais hipnóticos
 - **Geração Procedural**: Cada partida é única com terreno e obstáculos gerados algoritmicamente
 - **Gameplay Desafiador**: Dificuldade progressiva com múltiplos tipos de inimigos
-- **Efeitos Visuais**: Partículas, explosões, rastros e túneis psicodélicos
+- **Efeitos Visuais**: Partículas, explosões espetaculares, rastros e túneis psicodélicos
+- **⚛️ Bomba Atômica**: Destrua todos os inimigos da tela com uma explosão épica!
+- **🐉 Boss Battles**: Enfrente chefões poderosos a cada 5 níveis
+- **🛒 Sistema de Loja**: Melhore sua nave com upgrades
 
 ## 🎯 Objetivo
 
@@ -21,6 +24,9 @@ Sobreviva o máximo possível voando através do túnel, destruindo inimigos e e
 
 - **Setas** ou **WASD**: Mover a nave
 - **Espaço**: Atirar
+- **B**: Lançar Bomba Atômica ⚛️
+- **TAB** ou **S**: Abrir Loja
+- **P**: Pausar
 - **ESC**: Sair do jogo
 
 ### Áudio
@@ -28,22 +34,64 @@ Sobreviva o máximo possível voando através do túnel, destruindo inimigos e e
 - **+/-**: Aumentar/Diminuir volume
 - **M**: Mute/Unmute
 
-### Tela de Game Over
-
-- **R**: Reiniciar o jogo
-- **ESC**: Sair
-
 ## 🚀 Como Executar
 
-1. Certifique-se de ter Python 3.12+ instalado
-2. Instale as dependências:
+### Requisitos
+
+- Python 3.12+
+- Sistema operacional: Linux, Windows, macOS
+
+### Instalação
+
+1. **Clone o repositório:**
+
+   ```bash
+   git clone https://github.com/hendelsantos/Pygame_Psychedelic_River_Raid.git
+   cd Pygame_Psychedelic_River_Raid
+   ```
+
+2. **Instale as dependências:**
+
    ```bash
    pip install pygame numpy scipy pydub simpleaudio
    ```
-3. Execute o jogo:
+
+3. **Execute o jogo:**
+
+   **Linux (Wayland/X11):**
+
+   ```bash
+   SDL_VIDEODRIVER=x11 python main.py
+   ```
+
+   **Windows/macOS:**
+
    ```bash
    python main.py
    ```
+
+### ⚠️ Por que `SDL_VIDEODRIVER=x11` no Linux?
+
+Se você está usando **Linux com Wayland** (padrão no Ubuntu 22.04+), o Pygame pode ter problemas de compatibilidade. A variável `SDL_VIDEODRIVER=x11` força o uso do X11, que tem melhor suporte no Pygame.
+
+**Sintomas sem essa variável:**
+
+- Janela do jogo não aparece
+- Tela preta
+- Erro de display
+
+**Solução permanente (opcional):**
+
+```bash
+# Adicione ao seu ~/.bashrc ou ~/.zshrc
+export SDL_VIDEODRIVER=x11
+```
+
+Depois reabra o terminal e execute apenas:
+
+```bash
+python main.py
+```
 
 ## 🎵 Sistema de Áudio Procedural
 
@@ -233,4 +281,5 @@ Este projeto é de código aberto e foi criado para fins educacionais e de entre
 ---
 
 **Divirta-se explorando o universo psicodélico! 🌈✨**
+
 # Pygame_Psychedelic_River_Raid

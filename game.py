@@ -21,9 +21,10 @@ from achievement_system import AchievementSystem
 from daily_mission_system import DailyMissionSystem
 from combo_system import ComboSystem
 from skin_system import SkinSystem
+from game_modes import GameMode, GameModeManager
 
 class Game:
-    def __init__(self, width, height, save_system=None):
+    def __init__(self, width, height, save_system=None, mode=GameMode.ARCADE, leaderboard=None):
         self.width = width
         self.height = height
         self.screen = pygame.display.set_mode((width, height))
@@ -35,6 +36,11 @@ class Game:
         # Sistema de save
         self.save_system = save_system if save_system else SaveSystem()
         
+        # Sistema de modo de jogo
+        self.mode_manager = GameModeManager()
+        self.mode_manager.set_mode(mode)
+        self.leaderboard = leaderboard
+        
         # Estatísticas da partida
         self.score = 0
         self.level = 1
@@ -44,8 +50,7 @@ class Game:
         self.game_start_time = time.time()
         self.coins_earned_this_game = 0  # Moedas ganhas nesta partida
         
-        # Inicializar sistema de áudio
-        print("🎵 Inicializando sistema de áudio...")
+        # Inicializar sistema de áudio (sem print)
         self.audio = AudioEngine()
         
         # Carregar configurações de volume
@@ -54,16 +59,20 @@ class Game:
         
         # Inicializar componentes do jogo
         self.player = Player(width // 2, height - 100)
+        
+        # Aplicar vidas iniciais baseado no modo
+        self.player.max_health = self.mode_manager.get_starting_lives() * 100
+        self.player.health = self.player.max_health
+        
         self.level_generator = LevelGenerator(width, height)
         self.effects = PsychedelicEffects(width, height)
         self.collision_manager = CollisionManager()
         self.hud = ProfessionalHUD(width, height)
         self.game_over_screen = GameOverScreen(width, height, self.save_system)
         self.shop = Shop(width, height, self.save_system)
-        self.gamepad = GamepadManager()  # Sistema de gamepad
+        self.gamepad = GamepadManager()
         
-        # NOVOS SISTEMAS DE ENGAJAMENTO
-        print("🎮 Inicializando sistemas de progressão...")
+        # Sistemas de progressão (sem print)
         self.progression = ProgressionSystem(self.save_system)
         self.achievements = AchievementSystem(self.save_system)
         self.daily_missions = DailyMissionSystem(self.save_system)
@@ -109,24 +118,23 @@ class Game:
         self.last_b_press_time = 0  # Tempo do último B pressionado (para duplo B)
         self.double_b_threshold = 0.3  # 300ms para detectar duplo B
         
-        # Timer para spawn de inimigos - SPAWN MAIS RÁPIDO!
+        # Timer para spawn de inimigos - ajustado pelo modo
         self.enemy_spawn_timer = 0
-        self.enemy_spawn_interval = 80  # frames (era 120) - 33% mais rápido!
+        base_spawn = 80
+        spawn_multiplier = self.mode_manager.get_enemy_spawn_rate()
+        self.enemy_spawn_interval = int(base_spawn / spawn_multiplier)
         
         # Cores psicodélicas
         self.color_shift = 0
         
         # Estado do jogo
         self.paused = False
-        self.lives = 3
+        self.lives = self.mode_manager.get_starting_lives()
         self.is_game_over = False
         self.game_over_timer = 0
         
-        # Iniciar música de fundo
-        print("🎶 Iniciando música procedural...")
+        # Iniciar música de fundo (sem print)
         self.audio.start_background_music()
-        
-        # Motor silencioso - apenas música e efeitos sonoros
         
     def handle_events(self):
         """Gerenciar eventos do jogo"""
@@ -137,14 +145,15 @@ class Game:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
                 elif event.key == pygame.K_TAB or event.key == pygame.K_s:
-                    # Abrir loja (TAB ou S)
-                    was_paused = self.paused
-                    self.paused = True
-                    result = self.open_shop()
-                    if result == "continue":
-                        self.paused = was_paused
-                        # Aplicar upgrades após sair da loja
-                        self.apply_upgrades_to_player()
+                    # Abrir loja (se permitido no modo)
+                    if self.mode_manager.is_shop_allowed():
+                        was_paused = self.paused
+                        self.paused = True
+                        result = self.open_shop()
+                        if result == "continue":
+                            self.paused = was_paused
+                            # Aplicar upgrades após sair da loja
+                            self.apply_upgrades_to_player()
                 elif event.key == pygame.K_p:
                     # Pausar/despausar jogo
                     self.paused = not self.paused
@@ -154,41 +163,23 @@ class Game:
                 elif event.key == pygame.K_b:
                     # ⚛️ DISPARAR BOMBA ATÔMICA
                     if self.atomic_bombs > 0 and not self.atomic_bomb_active:
-                        print("🚀 Lançando bomba atômica!")
                         self.atomic_bombs -= 1
                         self.atomic_bomb_active = True
                         self.atomic_bomb_x = self.player.x
                         self.atomic_bomb_y = self.player.y
-                        self.audio.play_sound('powerup')  # Som de lançamento
+                        self.audio.play_sound('powerup')
                 elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS:
                     # Aumentar volume em incrementos menores
                     new_volume = min(1.0, self.audio.volume + 0.05)
                     self.audio.set_volume(new_volume)
                 elif event.key == pygame.K_MINUS:
-                    # Diminuir volume em incrementos menores
                     new_volume = max(0.0, self.audio.volume - 0.05)
                     self.audio.set_volume(new_volume)
                 elif event.key == pygame.K_m:
-                    # Mute/unmute
                     if self.audio.volume > 0:
                         self.audio.set_volume(0.0)
                     else:
-                        self.audio.set_volume(0.3)  # Volume padrão mais baixo
-                elif event.key == pygame.K_b:
-                    # MODO TESTE: Spawnar boss imediatamente (tecla B)
-                    if not self.boss_active:
-                        print("🎮 MODO TESTE: Spawnando boss...")
-                        self.spawn_boss()
-                elif event.key == pygame.K_l:
-                    # MODO TESTE: Adicionar nível (tecla L)
-                    self.level += 1
-                    print(f"🎮 MODO TESTE: Level aumentado para {self.level}")
-                    if self.level % 5 == 0:
-                        print(f"   Próximo boss natural no nível {self.level}")
-                elif event.key == pygame.K_c:
-                    # MODO TESTE: Adicionar 1000 moedas (tecla C)
-                    self.coins_earned_this_game += 1000
-                    print(f"🎮 MODO TESTE: +1000 moedas (Total: {self.coins_earned_this_game})")
+                        self.audio.set_volume(0.3)
         
         # Botões do gamepad (detectar single press)
         if self.gamepad.is_connected():
@@ -288,7 +279,6 @@ class Game:
             
             # Quando chega NO TOPO (antes de sair da tela), EXPLODE AUTOMATICAMENTE!
             if self.atomic_bomb_y <= 30:  # No topo da tela, ainda visível
-                print(f"💥 Bomba atingiu o topo em Y={self.atomic_bomb_y} - EXPLODINDO!")
                 self.trigger_atomic_explosion()
                 self.atomic_bomb_active = False
         
@@ -313,34 +303,32 @@ class Game:
         self.update_particles()
         self.effects.update_explosion_particles(self.explosion_particles, dt)
         
-        # Aumentar pontuação baseada na sobrevivência
-        self.score += 1
+        # Aumentar pontuação baseada na sobrevivência (com multiplicador)
+        self.add_score(1)
         
         # Aumentar nível a cada 5000 pontos
         new_level = (self.score // 5000) + 1
         if new_level > self.level:
             self.level = new_level
-            self.game_speed = min(8.0, 2 + (self.level * 0.3))  # Velocidade limitada
+            self.game_speed = min(8.0, 2 + (self.level * 0.3))
             self.level_generator.increase_difficulty()
             
-            print(f"⬆️ LEVEL UP! Agora você está no nível {self.level}")
-            print(f"   Velocidade: {self.game_speed:.1f} | Spawn: {self.enemy_spawn_interval:.0f}")
-            
-            # ⚛️ GANHAR 1 BOMBA ATÔMICA POR FASE!
+            # Ganhar bomba atômica por fase
             if self.atomic_bombs < self.max_atomic_bombs:
                 self.atomic_bombs += 1
-                print(f"⚛️  BOMBA ATÔMICA RECEBIDA! Total: {self.atomic_bombs}")
             
-            # ✅ GARANTIR BOSS A CADA 5 NÍVEIS
-            if self.level % 5 == 0:
+            # Boss a cada X níveis (baseado no modo)
+            boss_freq = self.mode_manager.get_boss_frequency()
+            if self.mode_manager.should_spawn_boss(self.level):
                 if not self.boss_active:
-                    print(f"🐉 BOSS DO NÍVEL {self.level} APARECENDO...")
                     self.spawn_boss()
-                else:
-                    print(f"⚠️ Boss ainda ativo, será spawnado após derrotá-lo")
             
-            # Ajustar dificuldade baseada no nível
             self.adjust_difficulty_by_level()
+    
+    def add_score(self, points):
+        """Adicionar pontos com multiplicador do modo"""
+        multiplier = self.mode_manager.get_score_multiplier()
+        self.score += int(points * multiplier)
     
     def process_player_input(self, keys):
         """Processar input do jogador (teclado + gamepad)"""
@@ -414,7 +402,6 @@ class Game:
     
     def spawn_boss(self):
         """Spawnar um boss"""
-        print(f"🐉 BOSS APARECEU! Nível {self.level}")
         
         # Limpar inimigos normais
         self.enemies.empty()
@@ -437,14 +424,13 @@ class Game:
         
         # Pontos pelo boss
         boss_score = self.boss.get_score_value()
-        self.score += boss_score
-        print(f"🏆 BOSS DERROTADO! +{boss_score:,} pontos!")
+        self.add_score(boss_score)
         
         # 🎮 ADICIONAR XP PELO BOSS (200 XP base)
         xp_gain = 200
         leveled_up, levels_gained = self.progression.add_xp(xp_gain)
         if leveled_up:
-            print(f"🎉 LEVEL UP! Nível {self.progression.player_level}")
+            pass  # Level up silencioso
         
         # 📊 ESTATÍSTICAS
         self.session_stats['bosses'] += 1
@@ -454,10 +440,8 @@ class Game:
         coin_multiplier = 1.0 + (self.save_system.get_upgrade_level('coin_multiplier') * 0.1)
         boss_coins = int(boss_coins * coin_multiplier)
         self.coins_earned_this_game += boss_coins
-        print(f"💰💰💰 +{boss_coins} moedas pelo BOSS!")
         
         # 💥💥💥 EXPLOSÃO FENOMENAL DO BOSS!!!
-        print("💥💥💥 EXPLOSÃO FENOMENAL DO BOSS! 💥💥💥")
         
         # Criar MÚLTIPLAS explosões gigantes ao redor do boss
         for i in range(8):
@@ -513,7 +497,6 @@ class Game:
         # ✅ VERIFICAR SE PRECISA SPAWNAR PRÓXIMO BOSS
         # Caso o jogador derrote um boss e já esteja em múltiplo de 5
         if self.level % 5 == 0:
-            print(f"🐉 Próximo boss do nível {self.level} spawnando em 3 segundos...")
             # Dar um tempo para o jogador respirar
             pygame.time.wait(3000)
             if not self.boss_active:  # Verificar de novo
@@ -535,7 +518,6 @@ class Game:
         
         self.enemy_spawn_interval = max(15, base_spawn - level_reduction - power_reduction)
         
-        print(f"   🎯 Dificuldade ajustada - Poder: {player_power:.1f}x | Spawn: {self.enemy_spawn_interval:.0f}")
     
         # Dar power-up de vida ao jogador
         self.player.health = min(self.player.max_health, self.player.health + 50)
@@ -620,25 +602,21 @@ class Game:
         if powerup_type == 'health':
             # Restaurar 30 de vida
             self.player.health = min(self.player.max_health, self.player.health + 30)
-            print(f"💚 Power-up de VIDA coletado! Vida: {self.player.health}")
         
         elif powerup_type == 'speed':
             # Aumentar velocidade temporariamente
             self.player.speed = min(8, self.player.speed + 1)
-            print(f"⚡ Power-up de VELOCIDADE coletado! Speed: {self.player.speed}")
         
         elif powerup_type == 'multishot':
             # Habilitar tiro múltiplo (pode ser implementado depois)
             self.player.shoot_cooldown_max = max(5, self.player.shoot_cooldown_max - 2)
-            print(f"🔫 Power-up de TIRO RÁPIDO coletado! Delay: {self.player.shoot_cooldown_max}")
         
         elif powerup_type == 'shield':
             # Escudo temporário (adicionar invulnerabilidade temporária)
             self.player.health = self.player.max_health
-            print(f"🛡️ Power-up de ESCUDO coletado! Vida restaurada!")
         
         # Adicionar pontos
-        self.score += 50
+        self.add_score(50)
         
         # Contabilizar power-up coletado
         self.powerups_collected += 1
@@ -672,7 +650,7 @@ class Game:
                 elif enemy_type == 'tank':
                     base_points = 500
                 
-                self.score += base_points
+                self.add_score(base_points)
                 self.enemies_killed += 1
                 
                 # 🎮 ADICIONAR KILL AO COMBO
@@ -686,8 +664,7 @@ class Game:
                 
                 # Verificar level up e desbloqueios
                 if leveled_up:
-                    print(f"🎉 LEVEL UP! Nível {self.progression.player_level}")
-                    # Verificar desbloqueios de skins
+                            # Verificar desbloqueios de skins
                     new_skins = self.skin_system.check_unlocks(
                         self.progression.player_level,
                         self.progression.prestige_level
@@ -721,7 +698,6 @@ class Game:
                         enemy_pos[0], enemy_pos[1], size_mult
                     )
                     self.explosion_particles.extend(giant_particles)
-                    print(f"💥 EXPLOSÃO ESPETACULAR! Tipo: {enemy_type}")
                 elif enemy_type == 'tank':
                     # Explosão grande
                     tank_particles = self.effects.create_giant_explosion(
@@ -754,7 +730,7 @@ class Game:
                 if self.boss.rect.colliderect(bullet.rect):
                     if self.boss.take_damage(10):
                         bullet.kill()
-                        self.score += 10
+                        self.add_score(10)
                         # Som de acerto no boss
                         self.audio.play_sound('enemy_hit')
                         # Partículas menores
@@ -800,7 +776,6 @@ class Game:
     
     def trigger_atomic_explosion(self):
         """⚛️ EXPLOSÃO ATÔMICA ÉPICA - Destrói TODOS os inimigos na tela! (NÃO causa dano ao jogador)"""
-        print("💥💥💥 EXPLOSÃO ATÔMICA ÉPICA! 💥💥💥")
         
         # Som de explosão épica (múltiplos sons para impacto)
         self.audio.play_sound('explosion')
@@ -853,7 +828,7 @@ class Game:
             )
             
             # Ganhar pontos e moedas
-            self.score += enemy.points * 2  # DOBRO de pontos!
+            self.add_score(enemy.points * 2)  # Bomba atômica
             coins = random.randint(5, 15)
             self.coins_earned_this_game += coins
             coins_earned += coins
@@ -867,7 +842,6 @@ class Game:
         if self.boss_active and self.boss:
             damage = 30  # Tira bastante vida do boss
             self.boss.take_damage(damage)
-            print(f"⚡ Boss levou {damage} de dano! Vida restante: {self.boss.health}")
             
             # Criar explosão no boss
             self.effects.create_giant_explosion(
@@ -876,7 +850,6 @@ class Game:
                 size_multiplier=5.0
             )
         
-        print(f"💣 {enemies_destroyed} inimigos destruídos! +{coins_earned} moedas!")
         
         # 🎆 PARTÍCULAS EXTRAS ÉPICAS (200+ partículas voando pela tela)
         for _ in range(250):
@@ -956,10 +929,29 @@ class Game:
         font_small = pygame.font.Font(None, 22)
         font_tiny = pygame.font.Font(None, 18)
         
+        # Pegar dados do modo de jogo
+        mode_icon = self.mode_manager.get_mode_icon()
+        mode_name = self.mode_manager.get_mode_name()
+        time_display = self.mode_manager.get_time_display()
+        
         # ============================================
         # CANTO SUPERIOR ESQUERDO - Score e Level
         # ============================================
         y_pos = 10
+        
+        # Modo de jogo (ícone + nome)
+        mode_text = f"{mode_icon} {mode_name}"
+        mode_surf = font_small.render(mode_text, True, (255, 200, 100))
+        self.screen.blit(mode_surf, (10, y_pos))
+        y_pos += 25
+        
+        # Timer (se houver)
+        if self.mode_manager.time_remaining is not None:
+            timer_text = f"⏱️ {time_display}"
+            timer_color = (255, 100, 100) if self.mode_manager.time_remaining < 30 else (255, 255, 255)
+            timer_surf = font_small.render(timer_text, True, timer_color)
+            self.screen.blit(timer_surf, (10, y_pos))
+            y_pos += 25
         
         # Score
         score_text = f"PONTOS: {self.score:,}"
@@ -1128,7 +1120,19 @@ class Game:
         # Calcular tempo jogado
         time_played = int(time.time() - self.game_start_time)
         
-        # 🏆 VERIFICAR CONQUISTAS FINAIS
+        # � SALVAR NO LEADERBOARD
+        if self.leaderboard:
+            from leaderboard_system import LeaderboardEntry
+            entry = LeaderboardEntry(
+                player_name="Player",
+                score=self.score,
+                level=self.level,
+                mode=self.mode_manager.get_mode_name(),
+                kills=self.enemies_killed
+            )
+            self.leaderboard.add_entry(entry)
+        
+        # �🏆 VERIFICAR CONQUISTAS FINAIS
         total_stats = {
             'total_kills': self.save_system.get_setting('total_kills', 0) + self.enemies_killed,
             'total_coins_earned': self.save_system.get_setting('total_coins_earned', 0) + self.coins_earned_this_game,
@@ -1152,12 +1156,10 @@ class Game:
         coins_with_multiplier = int(self.coins_earned_this_game * self.progression.coin_multiplier)
         if coins_with_multiplier > 0:
             self.save_system.add_coins(coins_with_multiplier)
-            print(f"💰 {coins_with_multiplier} moedas salvas! Total: {self.save_system.get_coins()}")
         
         # 🌟 ADICIONAR XP FINAL BASEADO NO LEVEL
         final_xp = self.level * 10
         self.progression.add_xp(final_xp)
-        print(f"🎮 Level: {self.progression.player_level} | Rank: {self.progression.get_rank_name()}")
         
         # Resetar tela de game over com estatísticas
         self.game_over_screen.reset(
@@ -1498,20 +1500,18 @@ class Game:
                 self.clock.tick(60)  # 60 FPS
         finally:
             # Limpar recursos de áudio
-            print("🎵 Finalizando sistema de áudio...")
             try:
                 self.audio.cleanup()
             except Exception as e:
-                print(f"⚠️ Aviso ao limpar áudio: {e}")
+                pass
     
     def cleanup(self):
         """Limpar recursos do jogo"""
-        print("🧹 Limpando recursos do jogo...")
         if hasattr(self, 'audio'):
             try:
                 self.audio.cleanup()
             except Exception as e:
-                print(f"⚠️ Aviso ao limpar áudio: {e}")
+                pass
     
     def draw_pause_screen(self):
         """Desenhar tela de pausa"""

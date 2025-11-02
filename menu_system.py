@@ -7,7 +7,7 @@ class MenuSystem:
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.current_menu = "main"  # main, settings, credits, game
+        self.current_menu = "main"  # main, settings, credits, leaderboard, mode_select
         
         # Configurações de fonte
         pygame.font.init()
@@ -17,7 +17,7 @@ class MenuSystem:
         
         # Configurações do menu
         self.selected_option = 0
-        self.menu_options = ["JOGAR", "CONFIGURAÇÕES", "CRÉDITOS", "SAIR"]
+        self.menu_options = ["JOGAR", "RANKINGS", "CONQUISTAS", "CONFIGURAÇÕES", "SAIR"]
         self.settings_options = ["VOLUME: ", "RESOLUÇÃO: ", "VOLTAR"]
         self.settings_values = ["70%", "800x600"]
         self.settings_selected = 0
@@ -74,13 +74,15 @@ class MenuSystem:
                 self.selected_option = (self.selected_option + 1) % len(self.menu_options)
             elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                 if self.selected_option == 0:  # JOGAR
-                    return "start_game"
-                elif self.selected_option == 1:  # CONFIGURAÇÕES
+                    return "mode_select"  # Ir para seleção de modo
+                elif self.selected_option == 1:  # RANKINGS
+                    return "leaderboard"
+                elif self.selected_option == 2:  # CONQUISTAS
+                    return "achievements"
+                elif self.selected_option == 3:  # CONFIGURAÇÕES
                     self.current_menu = "settings"
                     self.settings_selected = 0
-                elif self.selected_option == 2:  # CRÉDITOS
-                    self.current_menu = "credits"
-                elif self.selected_option == 3:  # SAIR
+                elif self.selected_option == 4:  # SAIR
                     return "quit"
         
         return None

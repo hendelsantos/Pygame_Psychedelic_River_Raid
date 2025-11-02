@@ -10,6 +10,9 @@ from game import Game
 from menu_system import MenuSystem
 from save_system import SaveSystem
 from settings_menu import SettingsMenu
+from mode_selection_menu import ModeSelectionMenu
+from leaderboard_system import LeaderboardSystem, LeaderboardRenderer
+from game_modes import GameMode
 
 class GameManager:
     def __init__(self):
@@ -27,25 +30,32 @@ class GameManager:
         self.running = True
         
         # Sistema de save global
-        print("💾 Inicializando sistema de save...")
         self.save_system = SaveSystem()
-        print(f"📊 High Score atual: {self.save_system.get_highest_score():,}")
+        
+        # Sistema de leaderboards
+        self.leaderboard = LeaderboardSystem()
+        self.leaderboard_renderer = LeaderboardRenderer(self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
         
         # Estados do jogo
-        self.state = "menu"  # menu, game, paused
+        self.state = "menu"  # menu, mode_select, game, leaderboard, achievements
         
         # Sistemas
         self.menu = MenuSystem(self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
+        self.mode_menu = ModeSelectionMenu(self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
         self.game = None
         self.settings_menu = SettingsMenu(self.SCREEN_WIDTH, self.SCREEN_HEIGHT, self.save_system)
         
+        # Modo de jogo selecionado
+        self.selected_mode = GameMode.ARCADE
+        
         # Delta time para animações suaves
         self.last_time = pygame.time.get_ticks()
+        self.leaderboard_mode_index = 0
+        self.leaderboard_modes = ['global', 'arcade', 'survival', 'boss_rush', 'time_attack']
     
     def handle_events(self):
         """Gerenciar eventos globais"""
         # Se estiver no jogo, não processar eventos aqui
-        # Deixar o game.handle_events() fazer isso
         if self.state == "game" and self.game:
             return
         
@@ -56,50 +66,70 @@ class GameManager:
                 if event.key == pygame.K_F11:
                     # Toggle fullscreen
                     pygame.display.toggle_fullscreen()
-                elif event.key == pygame.K_ESCAPE and self.state == "game":
-                    # Voltar ao menu do jogo
-                    print("🎵 ESC pressionado - voltando ao menu...")
-                    self.state = "menu"
-                    if self.game:
-                        self.game.cleanup()
-                        self.game = None
-                    # Reativar música do menu
-                    if hasattr(self.menu, 'audio'):
-                        self.menu.audio.start_background_music()
-                        self.menu.apply_volume_setting()
-                        self.game = None
+                elif event.key == pygame.K_ESCAPE:
+                    if self.state == "game":
+                        self.state = "menu"
+                        if self.game:
+                            self.game.cleanup()
+                            self.game = None
+                        if hasattr(self.menu, 'audio'):
+                            self.menu.audio.start_background_music()
+                            self.menu.apply_volume_setting()
+                    elif self.state in ["leaderboard", "achievements", "mode_select"]:
+                        self.state = "menu"
+                
+                # Trocar modo no leaderboard
+                if self.state == "leaderboard" and event.key == pygame.K_TAB:
+                    self.leaderboard_mode_index = (self.leaderboard_mode_index + 1) % len(self.leaderboard_modes)
             
             # Passar eventos para o sistema atual
             if self.state == "menu":
                 result = self.menu.handle_event(event)
                 if result:
                     self.handle_menu_result(result)
+            elif self.state == "mode_select":
+                result = self.mode_menu.handle_event(event)
+                if result:
+                    self.handle_mode_selection(result)
     
     def handle_menu_result(self, result):
         """Processar resultados do menu"""
-        if result == "start_game":
-            # Pausar áudio do menu antes de iniciar o jogo
-            print("🎵 Transferindo música do menu para o jogo...")
-            
-            self.state = "game"
-            self.game = Game(self.SCREEN_WIDTH, self.SCREEN_HEIGHT, self.save_system)
-            
-            # Aplicar configurações de volume do menu
-            volume = self.menu.get_volume_setting()
-            self.game.audio.set_volume(volume)
-            
-            print("🎶 Música do jogo ativada!")
+        if result == "mode_select":
+            self.state = "mode_select"
+        elif result == "leaderboard":
+            self.state = "leaderboard"
+            self.leaderboard_mode_index = 0
+        elif result == "achievements":
+            self.state = "achievements"
         elif result == "settings":
-            # Abrir menu de configurações
             self.open_settings_menu()
-        elif result == "shop":
-            # Abrir loja
-            if self.game:
-                result = self.game.open_shop()
-                if result == "quit":
-                    self.running = False
         elif result == "quit":
             self.running = False
+    
+    def handle_mode_selection(self, result):
+        """Processar seleção de modo"""
+        if result == "back":
+            self.state = "menu"
+        elif isinstance(result, GameMode):
+            # Modo selecionado - iniciar jogo
+            self.selected_mode = result
+            self.start_game(result)
+    
+    def start_game(self, mode: GameMode):
+        """Iniciar jogo com modo específico"""
+        self.state = "game"
+        self.game = Game(
+            self.SCREEN_WIDTH, 
+            self.SCREEN_HEIGHT, 
+            self.save_system
+        )
+        
+        # TODO: Integrar modo de jogo quando game.py estiver atualizado
+        # self.game.set_mode(mode)
+        
+        # Aplicar configurações de volume
+        volume = self.menu.get_volume_setting()
+        self.game.audio.set_volume(volume)
     
     def open_settings_menu(self):
         """Abrir menu de configurações"""

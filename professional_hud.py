@@ -230,7 +230,7 @@ class ProfessionalHUD:
             text = self.small_font.render(control, True, color)
             screen.blit(text, (start_x, start_y + i * 28))
     
-    def draw_complete_hud(self, screen, score, lives, level, health=100, player_y=0, level_generator=None, coins=0, fps=0.0, show_fps=False):
+    def draw_complete_hud(self, screen, score, lives, level, health=100, player_y=0, level_generator=None, coins=0, fps=0.0, show_fps=False, mode_icon="🎮", time_display=None):
         """Desenhar HUD completo e limpo"""
         # Esquerda: Score (topo) e Level (abaixo)
         self.draw_score(screen, score)
@@ -244,6 +244,14 @@ class ProfessionalHUD:
         if coins > 0:
             self.draw_coins(screen, coins)
         
+        # Modo de jogo (canto superior centro-esquerda)
+        if mode_icon:
+            self.draw_mode_icon(screen, mode_icon)
+        
+        # Timer (se houver)
+        if time_display:
+            self.draw_timer(screen, time_display)
+        
         # FPS (canto superior direito)
         if show_fps and fps > 0:
             self.draw_fps(screen, fps)
@@ -251,6 +259,29 @@ class ProfessionalHUD:
         # Controles (primeiros 10 segundos)
         if self.show_controls:
             self.draw_controls_help(screen)
+    
+    def draw_mode_icon(self, screen, icon):
+        """Desenhar ícone do modo de jogo"""
+        mode_text = f"{icon}"
+        color = self.get_psychedelic_color((255, 200, 100), 0.9)
+        
+        # Posição: centro-esquerda superior
+        pos_x = self.width // 2 - 100
+        pos_y = 30
+        
+        text_surf = self.large_font.render(mode_text, True, color)
+        screen.blit(text_surf, (pos_x, pos_y))
+    
+    def draw_timer(self, screen, time_display):
+        """Desenhar timer (para Time Attack)"""
+        timer_text = f"⏱️ {time_display}"
+        color = self.get_psychedelic_color((255, 100, 100), 1.0)
+        
+        # Posição: centro-direita superior
+        pos_x = self.width // 2 + 50
+        pos_y = 30
+        
+        self.draw_glow_text(screen, timer_text, self.large_font, color, (pos_x, pos_y), glow=True)
     
     def draw_coins(self, screen, coins):
         """Desenhar contador de moedas"""
