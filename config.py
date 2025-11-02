@@ -1,0 +1,56 @@
+# Configurações do Psychedelic River Raid
+
+# Configurações da Tela
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+FPS = 60
+
+# Configurações do Jogador
+PLAYER_SPEED = 5
+PLAYER_HEALTH = 100
+PLAYER_SHOOT_DELAY = 10
+
+# Configurações dos Inimigos
+ENEMY_SPAWN_INTERVAL = 120  # frames
+ENEMY_SPAWN_MIN_INTERVAL = 30
+
+# Pontuação
+POINTS_PER_FRAME = 1
+POINTS_BASIC_ENEMY = 100
+POINTS_FAST_ENEMY = 150
+POINTS_SHOOTER_ENEMY = 200
+LEVEL_UP_POINTS = 5000
+
+# Configurações Visuais
+COLOR_SHIFT_SPEED = 0.02
+PARTICLE_COUNT_EXPLOSION = 15
+PARTICLE_COUNT_THRUST = 2
+
+# Configurações de Dificuldade
+SPEED_INCREASE_PER_LEVEL = 0.5
+WALL_WIDTH_DECREASE_PER_LEVEL = 5
+MIN_WALL_WIDTH = 80
+
+# Configurações de Efeitos
+FLOATING_PARTICLES = 30
+TUNNEL_RINGS = 20
+FRACTAL_POINTS = 100
+ENERGY_RAYS = 8
+
+# Probabilidades (%)
+OBSTACLE_SPAWN_CHANCE = 3.0
+POWERUP_SPAWN_CHANCE = 0.33
+ENEMY_SHOOT_CHANCE = 1.0
+
+# Cores Base (HSV hue values 0-1)
+PLAYER_HUE = 0.6      # Azul/Ciano
+ENEMY_BASIC_HUE = 0.0 # Vermelho
+ENEMY_FAST_HUE = 0.3  # Amarelo
+ENEMY_SHOOTER_HUE = 0.8 # Magenta
+TERRAIN_HUE = 0.7     # Azul escuro
+
+# Power-ups
+POWERUP_HEALTH_HUE = 0.0    # Vermelho
+POWERUP_SPEED_HUE = 0.16    # Amarelo
+POWERUP_MULTISHOT_HUE = 0.66 # Azul
+POWERUP_SHIELD_HUE = 0.33   # Verde
