@@ -12,6 +12,10 @@ class Enemy(pygame.sprite.Sprite):
         self.enemy_type = enemy_type
         self.animation_frame = 0
         
+        # Inicializar atributos padrão (antes de setup_enemy_type)
+        self.shield_health = 0
+        self.max_shield = 0
+        
         # Configurações baseadas no tipo
         self.setup_enemy_type()
         

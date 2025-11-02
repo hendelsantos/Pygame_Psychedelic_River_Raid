@@ -216,6 +216,8 @@ class Boss(pygame.sprite.Sprite):
     
     def get_health_ratio(self):
         """Obter razão de vida atual"""
+        if self.max_health == 0:
+            return 0
         return self.health / self.max_health
     
     def draw(self, screen):
@@ -255,36 +257,27 @@ class Boss(pygame.sprite.Sprite):
     
     def draw_boss_body(self, screen, color, alpha):
         """Desenhar corpo principal do boss"""
-        # Forma do boss baseada no tipo
-        if self.boss_type == 'standard':
-            # Boss padrão - forma de diamante
-            points = [
-                (self.x, self.y - self.height // 2),
-                (self.x + self.width // 2, self.y),
-                (self.x, self.y + self.height // 2),
-                (self.x - self.width // 2, self.y)
-            ]
-            pygame.draw.polygon(screen, color, points)
-            pygame.draw.polygon(screen, (255, 255, 255), points, 3)
+        # Desenhar forma genérica baseada no tamanho do boss
+        # Forma de diamante para todos (simples e efetivo)
+        points = [
+            (int(self.x), int(self.y - self.height // 2)),
+            (int(self.x + self.width // 2), int(self.y)),
+            (int(self.x), int(self.y + self.height // 2)),
+            (int(self.x - self.width // 2), int(self.y))
+        ]
         
-        elif self.boss_type == 'fortress':
-            # Fortaleza - retângulo robusto
-            rect = pygame.Rect(self.x - self.width // 2, self.y - self.height // 2,
-                             self.width, self.height)
-            pygame.draw.rect(screen, color, rect)
-            pygame.draw.rect(screen, (255, 255, 255), rect, 3)
+        # Desenhar corpo principal
+        pygame.draw.polygon(screen, color, points)
+        pygame.draw.polygon(screen, (255, 255, 255), points, 3)
         
-        elif self.boss_type == 'serpent':
-            # Serpente - círculo (cabeça)
-            pygame.draw.circle(screen, color, (int(self.x), int(self.y)), 
-                             self.width // 3)
-            pygame.draw.circle(screen, (255, 255, 255), (int(self.x), int(self.y)),
-                             self.width // 3, 3)
+        # Círculo central (núcleo/core)
+        core_size = min(self.width, self.height) // 4
+        pygame.draw.circle(screen, (255, 255, 255), (int(self.x), int(self.y)), core_size)
         
-        # Olho/núcleo central pulsante
-        pulse_size = 10 + int(5 * math.sin(self.pulse))
-        pygame.draw.circle(screen, (255, 255, 0), (int(self.x), int(self.y)), 
-                         pulse_size)
+        # Olho/núcleo pulsante
+        pulse_size = int(core_size * 0.6 + core_size * 0.4 * math.sin(self.pulse))
+        pulse_color = tuple(int(c * 1.5) % 256 for c in color)  # Cor mais brilhante
+        pygame.draw.circle(screen, pulse_color, (int(self.x), int(self.y)), pulse_size)
     
     def draw_boss_part(self, screen, part, color, alpha):
         """Desenhar parte do boss (turret, asa, etc)"""
