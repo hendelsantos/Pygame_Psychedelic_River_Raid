@@ -22,6 +22,9 @@ from daily_mission_system import DailyMissionSystem
 from combo_system import ComboSystem
 from skin_system import SkinSystem
 from game_modes import GameMode, GameModeManager
+from boss_types import BossType, BossConfig
+from scenario_system import ScenarioType, ScenarioRenderer
+from name_input import NameInputDialog
 
 class Game:
     def __init__(self, width, height, save_system=None, mode=GameMode.ARCADE, leaderboard=None):
@@ -71,6 +74,9 @@ class Game:
         self.game_over_screen = GameOverScreen(width, height, self.save_system)
         self.shop = Shop(width, height, self.save_system)
         self.gamepad = GamepadManager()
+        
+        # Sistema de cenários dinâmicos
+        self.scenario_renderer = ScenarioRenderer(width, height)
         
         # Sistemas de progressão (sem print)
         self.progression = ProgressionSystem(self.save_system)
@@ -286,8 +292,11 @@ class Game:
         self.effects.update()
         self.color_shift += 0.02
         
-        # 🎮 ATUALIZAR SISTEMAS DE ENGAJAMENTO
+        # � ATUALIZAR CENÁRIO DINÂMICO
         dt = 1/60  # Delta time
+        self.scenario_renderer.update(dt)
+        
+        # 🎮 ATUALIZAR SISTEMAS DE ENGAJAMENTO
         self.combo.update(dt)
         self.skin_system.update_trail((self.player.x, self.player.y))
         
@@ -312,6 +321,10 @@ class Game:
             self.level = new_level
             self.game_speed = min(8.0, 2 + (self.level * 0.3))
             self.level_generator.increase_difficulty()
+            # Atualizar cenário quando o nível mudar
+            from scenario_system import ScenarioConfig
+            new_scenario = ScenarioConfig.get_scenario_for_level(self.level)
+            self.scenario_renderer.set_scenario(new_scenario)
             
             # Ganhar bomba atômica por fase
             if self.atomic_bombs < self.max_atomic_bombs:
@@ -406,11 +419,10 @@ class Game:
         # Limpar inimigos normais
         self.enemies.empty()
         
-        # Escolher tipo de boss baseado no nível
-        boss_types = ['standard', 'fortress', 'serpent']
-        boss_type = boss_types[(self.level // 5 - 1) % len(boss_types)]
+        # Escolher tipo de boss baseado no nível usando BossConfig
+        boss_type = BossConfig.get_type_for_level(self.level)
         
-        # Criar boss
+        # Criar boss com tipo específico
         self.boss = Boss(self.width // 2, -100, boss_type, self.level)
         self.boss_active = True
         
@@ -1120,11 +1132,38 @@ class Game:
         # Calcular tempo jogado
         time_played = int(time.time() - self.game_start_time)
         
-        # � SALVAR NO LEADERBOARD
+        
+        # 📝 INPUT DE NOME DO JOGADOR
+        name_dialog = NameInputDialog(self.width, self.height)
+        name_dialog.activate()
+        player_name = "Player"  # Valor padrão
+        
+        # Loop do diálogo de nome
+        while name_dialog.active:
+            dt = self.clock.tick(60) / 1000.0
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    name_dialog.deactivate()
+                    player_name = "Player"
+                    break
+                
+                result = name_dialog.handle_event(event)
+                if result:  # Nome confirmado ou ESC pressionado
+                    player_name = result
+                    break
+            
+            # Renderizar jogo pausado + diálogo
+            self.render()
+            name_dialog.update(dt)
+            name_dialog.render(self.screen)
+            pygame.display.flip()
+        
+        # 🏆 SALVAR NO LEADERBOARD
         if self.leaderboard:
             from leaderboard_system import LeaderboardEntry
             entry = LeaderboardEntry(
-                player_name="Player",
+                player_name=player_name,
                 score=self.score,
                 level=self.level,
                 mode=self.mode_manager.get_mode_name(),
@@ -1314,7 +1353,10 @@ class Game:
         # 🎮 APLICAR SCREEN SHAKE DO COMBO
         shake_offset = self.combo.get_screen_shake()
         
-        # Fundo psicodélico
+        # 🌌 RENDERIZAR CENÁRIO DINÂMICO (antes do fundo psicodélico)
+        self.scenario_renderer.render(self.screen)
+        
+        # Fundo psicodélico (agora com transparência)
         self.effects.draw_background(self.screen, self.color_shift)
         
         # Desenhar nível (terreno e obstáculos)

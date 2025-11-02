@@ -3,25 +3,37 @@ import math
 import random
 import colorsys
 from bullet import Bullet
+from boss_types import BossType, BossConfig, BossAttackPattern, BossMovementPattern
 
 class Boss(pygame.sprite.Sprite):
-    def __init__(self, x, y, boss_type='standard', level=1):
+    def __init__(self, x, y, boss_type=BossType.STANDARD, level=1):
         super().__init__()
         self.x = x
         self.y = y
-        self.boss_type = boss_type
         self.level = level
         
-        # Dimensões maiores para boss
-        self.width = 120
-        self.height = 100
+        # Garantir que boss_type seja BossType enum
+        if isinstance(boss_type, str):
+            # Compatibilidade com código antigo
+            try:
+                self.boss_type = BossType(boss_type)
+            except ValueError:
+                self.boss_type = BossType.STANDARD
+        else:
+            self.boss_type = boss_type
         
-        # Status
-        self.max_health = 1000 + (level * 500)  # Mais vida a cada nível
+        # Carregar configuração do boss
+        self.config = BossConfig.get_config(self.boss_type, level)
+        
+        # Dimensões do boss (da config)
+        self.width, self.height = self.config['size']
+        
+        # Status (da config)
+        self.max_health = self.config['max_health']
         self.health = self.max_health
-        self.speed = 1.5
-        self.phase = 1  # Fase atual do boss (1, 2, 3)
-        self.max_phases = 3
+        self.speed = self.config['speed']
+        self.phase = 1
+        self.max_phases = self.config['phases']
         
         # Criar sprite
         self.image = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -29,14 +41,16 @@ class Boss(pygame.sprite.Sprite):
         self.rect.centerx = x
         self.rect.centery = y
         
-        # Sistema de ataque
+        # Sistema de ataque (da config)
         self.shoot_cooldown = 0
-        self.shoot_delay = 30  # Frames entre ataques
+        self.shoot_delay = self.config['shoot_delay']
         self.attack_pattern = 0
+        self.attack_patterns = self.config['attack_patterns']
         self.pattern_timer = 0
         
-        # Movimento
-        self.movement_pattern = 'enter'  # enter, circular, zigzag, stationary
+        # Movimento (da config)
+        self.movement_pattern = 'enter'
+        self.movement_patterns = self.config['movement_patterns']
         self.movement_timer = 0
         self.initial_y = y
         self.angle = 0
@@ -44,6 +58,11 @@ class Boss(pygame.sprite.Sprite):
         # Animação
         self.animation_frame = 0
         self.pulse = 0
+        
+        # Habilidades especiais
+        self.special_ability = self.config.get('special_ability')
+        self.special_timer = 0
+        self.special_data = {}  # Dados específicos da habilidade
         
         # Partes do boss (para ataques múltiplos)
         self.parts = []
@@ -54,27 +73,18 @@ class Boss(pygame.sprite.Sprite):
         self.invulnerable_timer = 0
         
     def create_boss_parts(self):
-        """Criar partes do boss (turrets, asas, etc)"""
-        if self.boss_type == 'standard':
-            # Boss padrão com 2 canhões laterais
+        """Criar partes do boss (turrets, asas, etc) - compatibilidade com código antigo"""
+        # Apenas para compatibilidade - a maioria dos bosses novos não usa parts
+        if self.boss_type == BossType.STANDARD:
             self.parts = [
                 {'x_offset': -40, 'y_offset': 0, 'active': True, 'health': 200},
                 {'x_offset': 40, 'y_offset': 0, 'active': True, 'health': 200}
             ]
-        elif self.boss_type == 'fortress':
-            # Fortaleza voadora com 4 turrets
-            self.parts = [
-                {'x_offset': -50, 'y_offset': -30, 'active': True, 'health': 150},
-                {'x_offset': 50, 'y_offset': -30, 'active': True, 'health': 150},
-                {'x_offset': -50, 'y_offset': 30, 'active': True, 'health': 150},
-                {'x_offset': 50, 'y_offset': 30, 'active': True, 'health': 150}
-            ]
-        elif self.boss_type == 'serpent':
-            # Serpente com segmentos
-            self.parts = [
-                {'x_offset': 0, 'y_offset': i * 30, 'active': True, 'health': 100}
-                for i in range(1, 5)
-            ]
+        elif self.boss_type == BossType.KRAKEN:
+            # Kraken usa tentáculos via special_ability, não parts
+            self.parts = []
+        else:
+            self.parts = []
     
     def update(self, screen_width, screen_height):
         """Atualizar boss"""
@@ -102,10 +112,10 @@ class Boss(pygame.sprite.Sprite):
         self.rect.centerx = int(self.x)
         self.rect.centery = int(self.y)
         
-        # Padrão de ataque
+        # Padrão de ataque - alternar entre os padrões disponíveis
         self.pattern_timer += 1
         if self.pattern_timer > 180:  # Mudar padrão a cada 3 segundos
-            self.attack_pattern = (self.attack_pattern + 1) % 4
+            self.attack_pattern = (self.attack_pattern + 1) % len(self.attack_patterns)
             self.pattern_timer = 0
     
     def update_movement(self, screen_width, screen_height):
@@ -117,24 +127,17 @@ class Boss(pygame.sprite.Sprite):
             if self.y < 150:
                 self.y += self.speed
             else:
-                self.movement_pattern = 'circular'
+                # Escolher próximo padrão de movimento dos disponíveis
+                if self.movement_patterns:
+                    self.movement_pattern = self.movement_patterns[0]
+                else:
+                    self.movement_pattern = 'circular'
                 self.initial_y = self.y
-        
-        elif self.movement_pattern == 'circular':
-            # Movimento circular
-            self.angle += 0.02
-            radius = 50
-            self.x = screen_width // 2 + math.cos(self.angle) * radius
-            self.y = self.initial_y + math.sin(self.angle * 2) * 30
-        
-        elif self.movement_pattern == 'zigzag':
-            # Movimento em zigue-zague
-            self.x += math.sin(self.movement_timer * 0.05) * 3
-            self.y += math.cos(self.movement_timer * 0.03) * 2
-        
-        elif self.movement_pattern == 'stationary':
-            # Parado (fase de ataque intenso)
-            pass
+                self.initial_x = self.x
+        else:
+            # Usar BossMovementPattern para atualizar posição
+            # Simular dt em frames (60 FPS = 1/60 por frame)
+            BossMovementPattern.update_position(self, self.movement_pattern, 1/60)
         
         # Manter dentro da tela
         self.x = max(self.width // 2, min(screen_width - self.width // 2, self.x))
@@ -175,41 +178,19 @@ class Boss(pygame.sprite.Sprite):
         if self.shoot_cooldown > 0:
             return []
         
-        bullets = []
-        
-        # Padrão 0: Tiro simples direto
-        if self.attack_pattern == 0:
-            bullet = Bullet(self.x, self.y + self.height // 2, 
-                          direction=1, color=(255, 0, 0), speed=5)
-            bullets.append(bullet)
-        
-        # Padrão 1: Tiro triplo
-        elif self.attack_pattern == 1:
-            for angle in [-0.3, 0, 0.3]:
-                bullet = Bullet(self.x, self.y + self.height // 2,
-                              direction=1, color=(255, 100, 0), speed=5)
-                bullet.angle = angle
-                bullets.append(bullet)
-        
-        # Padrão 2: Tiro circular (8 direções)
-        elif self.attack_pattern == 2:
-            for i in range(8):
-                angle = (i / 8) * 2 * math.pi
-                bullet = Bullet(self.x, self.y,
-                              direction=1, color=(255, 0, 255), speed=4)
-                bullet.vel_x = math.cos(angle) * 4
-                bullet.vel_y = math.sin(angle) * 4
-                bullets.append(bullet)
-        
-        # Padrão 3: Tiro das partes
-        elif self.attack_pattern == 3:
-            for part in self.parts:
-                if part['active']:
-                    part_x = self.x + part['x_offset']
-                    part_y = self.y + part['y_offset']
-                    bullet = Bullet(part_x, part_y,
-                                  direction=1, color=(0, 255, 255), speed=6)
-                    bullets.append(bullet)
+        # Usar padrão de ataque da configuração
+        if self.attack_pattern < len(self.attack_patterns):
+            pattern_name = self.attack_patterns[self.attack_pattern]
+            bullets = BossAttackPattern.create_attack(
+                pattern_name,
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+                self.config['color_primary']
+            )
+        else:
+            bullets = []
         
         # Adicionar bullets ao grupo
         for bullet in bullets:
@@ -239,14 +220,18 @@ class Boss(pygame.sprite.Sprite):
     
     def draw(self, screen):
         """Desenhar boss com efeitos psicodélicos"""
-        # Cor baseada na fase
-        phase_hues = {1: 0.0, 2: 0.33, 3: 0.66}  # Vermelho, Verde, Azul
-        base_hue = phase_hues.get(self.phase, 0.0)
+        # Usar cores da configuração
+        primary_color = self.config['color_primary']
+        secondary_color = self.config['color_secondary']
         
-        # Pulso de cor
-        hue = (base_hue + self.pulse * 0.1) % 1.0
-        rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
-        color = tuple(int(c * 255) for c in rgb)
+        # Pulso de cor baseado na animação
+        pulse_factor = 0.5 + 0.5 * math.sin(self.pulse)
+        
+        # Misturar cores primary e secondary baseado no pulso
+        color = tuple(
+            int(primary_color[i] * pulse_factor + secondary_color[i] * (1 - pulse_factor))
+            for i in range(3)
+        )
         
         # Efeito de invulnerabilidade
         if self.invulnerable:
@@ -257,10 +242,13 @@ class Boss(pygame.sprite.Sprite):
         # Corpo principal do boss
         self.draw_boss_body(screen, color, alpha)
         
-        # Desenhar partes
+        # Desenhar partes (se houver)
         for part in self.parts:
             if part['active']:
                 self.draw_boss_part(screen, part, color, alpha)
+        
+        # Ícone do tipo de boss
+        self.draw_boss_icon(screen)
         
         # Barra de vida
         self.draw_health_bar(screen)
@@ -312,6 +300,21 @@ class Boss(pygame.sprite.Sprite):
         pygame.draw.line(screen, color, (part_x, part_y),
                         (part_x, part_y + 20), 4)
     
+    def draw_boss_icon(self, screen):
+        """Desenhar ícone do tipo de boss"""
+        icon = self.config.get('icon', '👾')
+        font = pygame.font.Font(None, 48)
+        try:
+            text = font.render(icon, True, (255, 255, 255))
+            text_rect = text.get_rect(center=(int(self.x), int(self.y) - self.height // 2 - 30))
+            screen.blit(text, text_rect)
+        except:
+            # Se não conseguir renderizar emoji, mostrar nome
+            name = self.config.get('name', 'BOSS')
+            text = font.render(name, True, (255, 255, 255))
+            text_rect = text.get_rect(center=(int(self.x), int(self.y) - self.height // 2 - 30))
+            screen.blit(text, text_rect)
+    
     def draw_health_bar(self, screen):
         """Desenhar barra de vida do boss"""
         bar_width = 200
@@ -347,9 +350,10 @@ class Boss(pygame.sprite.Sprite):
         # Borda
         pygame.draw.rect(screen, (255, 255, 255), bg_rect, 2)
         
-        # Texto
+        # Texto com nome do boss
         font = pygame.font.Font(None, 24)
-        text = font.render(f"BOSS - FASE {self.phase}", True, (255, 255, 255))
+        boss_name = self.config.get('name', 'BOSS')
+        text = font.render(f"{boss_name} - FASE {self.phase}", True, (255, 255, 255))
         text_rect = text.get_rect(center=(bar_x + bar_width // 2, bar_y - 15))
         screen.blit(text, text_rect)
         

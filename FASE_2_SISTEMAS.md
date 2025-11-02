@@ -10,19 +10,20 @@
 
 **9 Tipos Únicos de Bosses:**
 
-| Boss | Ícone | HP Base | Habilidade Especial | Score |
-|------|-------|---------|---------------------|-------|
-| **Guardian** | 🛸 | 1000 | Padrão clássico | 5000 |
-| **Deep Kraken** | 🐙 | 1200 | Spawna 8 tentáculos | 7000 |
-| **Eternal Phoenix** | 🔥 | 800 | Ressuscita 1x com 50% HP | 10000 |
-| **Assault Mecha** | 🤖 | 1500 | Escudo regenerável | 8000 |
-| **Void Lord** | 👁️ | 900 | Teletransporta a cada 5s | 9000 |
-| **Crystal Guardian** | 💎 | 1100 | Spawna cristais destrutíveis | 7500 |
-| **Hive Queen** | 👑 | 700 | Spawna 5 minions por wave | 6500 |
-| **Ancient Titan** | ⚔️ | 2000 | Earthquake (screen shake) | 12000 |
-| **Phantom Specter** | 👻 | 600 | Fica intangível 3s/10s | 8500 |
+| Boss                 | Ícone | HP Base | Habilidade Especial          | Score |
+| -------------------- | ----- | ------- | ---------------------------- | ----- |
+| **Guardian**         | 🛸    | 1000    | Padrão clássico              | 5000  |
+| **Deep Kraken**      | 🐙    | 1200    | Spawna 8 tentáculos          | 7000  |
+| **Eternal Phoenix**  | 🔥    | 800     | Ressuscita 1x com 50% HP     | 10000 |
+| **Assault Mecha**    | 🤖    | 1500    | Escudo regenerável           | 8000  |
+| **Void Lord**        | 👁️    | 900     | Teletransporta a cada 5s     | 9000  |
+| **Crystal Guardian** | 💎    | 1100    | Spawna cristais destrutíveis | 7500  |
+| **Hive Queen**       | 👑    | 700     | Spawna 5 minions por wave    | 6500  |
+| **Ancient Titan**    | ⚔️    | 2000    | Earthquake (screen shake)    | 12000 |
+| **Phantom Specter**  | 👻    | 600     | Fica intangível 3s/10s       | 8500  |
 
 **Classes Implementadas:**
+
 - `BossType` (Enum): Define os 9 tipos
 - `BossConfig`: Configurações completas de cada boss
   - Vida, tamanho, velocidade
@@ -37,6 +38,7 @@
   - Circular, zigzag, teleporte, swooping, etc
 
 **Progressão por Nível:**
+
 - Níveis 1-5: Standard, Swarm Queen
 - Níveis 6-10: Kraken, Crystal Beast
 - Níveis 11-15: Mecha, Void Lord
@@ -49,18 +51,19 @@
 
 **8 Cenários Visuais Únicos:**
 
-| Cenário | Ícone | Descrição | Efeitos Especiais |
-|---------|-------|-----------|-------------------|
-| **Deep Space** | 🌌 | Espaço sideral | Estrelas, nebulosas |
-| **Alien Desert** | 🏜️ | Dunas alienígenas | Tempestade de areia |
-| **Deep Ocean** | 🌊 | Profundezas | Bolhas, ondas |
-| **Inferno World** | 🔥 | Mundo de lava | Chamas, distorção de calor |
-| **Frozen Planet** | ❄️ | Planeta congelado | Neve, cristais de gelo |
-| **Mystic Forest** | 🌳 | Floresta alienígena | Vaga-lumes, trepadeiras |
-| **Neon City** | 🌃 | Cidade cyberpunk | Neons, chuva digital Matrix |
-| **Dimensional Void** | 🕳️ | Vazio dimensional | Rifts, distorção de realidade |
+| Cenário              | Ícone | Descrição           | Efeitos Especiais             |
+| -------------------- | ----- | ------------------- | ----------------------------- |
+| **Deep Space**       | 🌌    | Espaço sideral      | Estrelas, nebulosas           |
+| **Alien Desert**     | 🏜️    | Dunas alienígenas   | Tempestade de areia           |
+| **Deep Ocean**       | 🌊    | Profundezas         | Bolhas, ondas                 |
+| **Inferno World**    | 🔥    | Mundo de lava       | Chamas, distorção de calor    |
+| **Frozen Planet**    | ❄️    | Planeta congelado   | Neve, cristais de gelo        |
+| **Mystic Forest**    | 🌳    | Floresta alienígena | Vaga-lumes, trepadeiras       |
+| **Neon City**        | 🌃    | Cidade cyberpunk    | Neons, chuva digital Matrix   |
+| **Dimensional Void** | 🕳️    | Vazio dimensional   | Rifts, distorção de realidade |
 
 **Classes Implementadas:**
+
 - `ScenarioType` (Enum): Define os 8 cenários
 - `ScenarioConfig`: Configurações visuais
   - Cores base do background
@@ -75,6 +78,7 @@
   - Sistema de animação contextual
 
 **Progressão Automática:**
+
 - Troca de cenário a cada 5 níveis
 - Níveis 1-5: Space
 - Níveis 6-10: Desert
@@ -90,6 +94,7 @@
 ### 3. 📝 Sistema de Input de Nome (`name_input.py`)
 
 **Diálogo Profissional para Nome:**
+
 - Interface visual moderna
 - Input com cursor piscante
 - Limite de 12 caracteres
@@ -100,6 +105,7 @@
 - ENTER para confirmar
 
 **Classe:**
+
 - `NameInputDialog`: Diálogo completo
   - Overlay escuro
   - Box de input centralizado
@@ -114,6 +120,7 @@
 ### Para Completar a FASE 2:
 
 #### 1. Atualizar `boss.py`:
+
 ```python
 # Importar novos sistemas
 from boss_types import BossType, BossConfig, BossAttackPattern
@@ -126,6 +133,7 @@ class Boss:
 ```
 
 #### 2. Atualizar `game.py`:
+
 ```python
 # Importar cenários
 from scenario_system import ScenarioType, ScenarioRenderer
@@ -143,6 +151,7 @@ self.scenario_renderer.render(self.screen)
 ```
 
 #### 3. Atualizar `game_over()`:
+
 ```python
 # Importar input de nome
 from name_input import NameInputDialog
@@ -170,13 +179,14 @@ entry = LeaderboardEntry(
 ```
 
 #### 4. Atualizar spawn de boss em `game.py`:
+
 ```python
 def spawn_boss(self):
     from boss_types import BossConfig
-    
+
     # Pegar tipo apropriado para o nível
     boss_type = BossConfig.get_type_for_level(self.level)
-    
+
     # Criar boss com tipo específico
     self.boss = Boss(
         self.width // 2,
@@ -191,6 +201,7 @@ def spawn_boss(self):
 ## 📊 ESTATÍSTICAS DA FASE 2
 
 **Arquivos Criados:**
+
 - `boss_types.py` (380 linhas)
 - `scenario_system.py` (420 linhas)
 - `name_input.py` (180 linhas)
@@ -199,6 +210,7 @@ def spawn_boss(self):
 **Total:** ~980 linhas de código novo
 
 **Features Adicionadas:**
+
 - ✅ 9 tipos de bosses únicos
 - ✅ 15+ padrões de ataque
 - ✅ 8 cenários visuais
@@ -211,6 +223,7 @@ def spawn_boss(self):
 ## 🎮 PRÓXIMOS PASSOS
 
 ### Integração Imediata (FASE 2.1):
+
 1. ✅ Integrar BossTypes no boss.py existente
 2. ✅ Adicionar ScenarioRenderer ao game.py
 3. ✅ Implementar NameInputDialog no game over
@@ -218,6 +231,7 @@ def spawn_boss(self):
 5. ✅ Testar transição de cenários
 
 ### Conteúdo Adicional (FASE 2.2):
+
 1. ⏳ Expandir skins (15+ designs)
 2. ⏳ Tutorial interativo visual
 3. ⏳ Animação de high score
@@ -225,6 +239,7 @@ def spawn_boss(self):
 5. ⏳ Configurações expandidas (idiomas)
 
 ### Steam Preparation (FASE 3):
+
 1. ⏳ Steamworks SDK integration
 2. ⏳ Steam Achievements sync
 3. ⏳ Steam Cloud saves
@@ -236,30 +251,35 @@ def spawn_boss(self):
 ## 🎨 PREVIEW DOS NOVOS BOSSES
 
 ### Kraken 🐙
+
 - **Movimenta-se em ondas**
 - **Spawna 8 tentáculos que atacam independentemente**
 - **Padrões: Varredura de tentáculos, nuvem de tinta, redemoinho**
 - **Fase 4: Ataque frenético com todos os tentáculos**
 
 ### Phoenix 🔥
+
 - **Voa em mergulhos rápidos**
 - **RESSUSCITA 1x com 50% de vida!**
 - **Padrões: Bolas de fogo grandes, ondas de chamas, chuva de meteoros**
 - **Velocidade 2.5x (o mais rápido)**
 
 ### Mecha 🤖
+
 - **Escudo regenerável (500 HP)**
 - **Recarga de escudo a cada 10 segundos**
 - **Padrões: Laser beam, barragem de mísseis, pulso EMP**
 - **O mais resistente (1500 HP base)**
 
 ### Void Lord 👁️
+
 - **Teletransporta a cada 5 segundos**
 - **Difícil de acertar!**
 - **Padrões: Orbes homing, ondas de sombra, rifts dimensionais**
 - **Movimenta-se entre dimensões**
 
 ### Titan ⚔️
+
 - **GIGANTE (180x160)**
 - **2000 HP base (o mais tank)**
 - **TERREMOTO causa screen shake + debris**
@@ -267,6 +287,7 @@ def spawn_boss(self):
 - **Lento mas devastador**
 
 ### Specter 👻
+
 - **Fica INTANGÍVEL 3s a cada 10s**
 - **Impossível acertar quando intangível!**
 - **Movimento fantasmagórico errático**
@@ -278,6 +299,7 @@ def spawn_boss(self):
 ## 🌈 PREVIEW DOS CENÁRIOS
 
 ### Desert 🏜️
+
 ```
 Tons amarelos/laranjas
 Tempestade de areia com 50 partículas
@@ -286,6 +308,7 @@ Dunas no background
 ```
 
 ### Ocean 🌊
+
 ```
 Azuis profundos
 30 bolhas subindo
@@ -294,6 +317,7 @@ Sem estrelas (underwater)
 ```
 
 ### Fire 🔥
+
 ```
 Vermelho/laranja intenso
 Chamas animadas
@@ -302,6 +326,7 @@ Luz forte (0.8 ambient)
 ```
 
 ### Cyber 🌃
+
 ```
 Roxo/magenta/ciano
 Chuva digital Matrix (20 streams)
@@ -315,16 +340,19 @@ Sem estrelas
 ## ✨ HIGHLIGHTS
 
 ### Variedade de Gameplay:
+
 - 9 bosses = 9 estratégias diferentes
 - 8 cenários = experiência visual única a cada 5 níveis
 - Input de nome = leaderboard personalizado
 
 ### Replayability:
+
 - Boss diferente cada vez
 - Progressão visual clara
 - Cada modo + cada boss = muitas combinações
 
 ### Polish:
+
 - Código modular e extensível
 - Fácil adicionar novos bosses
 - Fácil adicionar novos cenários
