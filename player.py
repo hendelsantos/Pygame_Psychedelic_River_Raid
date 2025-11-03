@@ -43,7 +43,7 @@ class Player(pygame.sprite.Sprite):
     def apply_skin(self, skin_data):
         """Aplica uma nova skin ao jogador."""
         self.skin = skin_data
-        print(f"🚀 Skin '{skin_data.get('name', 'Desconhecida')}' aplicada!")
+        # Skin aplicada com sucesso
 
     def update(self, keys, screen_width, screen_height, bullets_group=None, audio=None, gamepad=None):
         """Atualizar o jogador"""

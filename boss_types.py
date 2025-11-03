@@ -187,14 +187,14 @@ class BossConfig:
         return configs.get(boss_type, configs[BossType.STANDARD])
     
     @staticmethod
-    def get_all_types():
+    def get_all_types() -> list:
         """Retorna lista de todos os tipos de boss"""
         return list(BossType)
     
     @staticmethod
     def get_random_type(exclude_standard=False):
         """Retorna tipo aleatório de boss"""
-        types = BossType.get_all_types()
+        types = list(BossType)  # Chamada direta ao invés de método
         if exclude_standard:
             types = [t for t in types if t != BossType.STANDARD]
         return random.choice(types)

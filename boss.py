@@ -158,7 +158,7 @@ class Boss(pygame.sprite.Sprite):
     
     def enter_new_phase(self, phase):
         """Entrar em nova fase com efeitos"""
-        print(f"🐉 BOSS FASE {phase}!")
+        # Boss entrou em nova fase
         self.phase = phase
         
         # Invulnerabilidade temporária
@@ -301,7 +301,7 @@ class Boss(pygame.sprite.Sprite):
             text = font.render(icon, True, (255, 255, 255))
             text_rect = text.get_rect(center=(int(self.x), int(self.y) - self.height // 2 - 30))
             screen.blit(text, text_rect)
-        except:
+        except (ValueError, pygame.error):
             # Se não conseguir renderizar emoji, mostrar nome
             name = self.config.get('name', 'BOSS')
             text = font.render(name, True, (255, 255, 255))

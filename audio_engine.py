@@ -112,7 +112,7 @@ class AudioEngine:
             }
         }
         
-        print("🎵 Sistema de áudio inicializado!")
+        # Sistema de áudio inicializado com sucesso
     
     def generate_wave(self, frequency, duration, wave_type='sine', amplitude=0.5):
         """Gerar onda sonora procedural"""
@@ -662,17 +662,17 @@ class AudioEngine:
             self.music_channel.set_volume(self.volume * 0.3)  # Música bem mais baixa
             self.sfx_channel.set_volume(self.volume * 0.7)    # SFX moderado
             self.ambient_channel.set_volume(self.volume * 0.2)  # Ambiente muito baixo
-        except:
+        except pygame.error:
             pass  # Ignorar se mixer não estiver inicializado
     
     def cleanup(self):
         """Limpar recursos de áudio"""
         try:
             self.stop_background_music()
-        except:
+        except pygame.error:
             pass  # Ignorar erros ao parar música
         
         try:
             pygame.mixer.quit()
-        except:
+        except pygame.error:
             pass  # Ignorar se mixer já foi finalizado
