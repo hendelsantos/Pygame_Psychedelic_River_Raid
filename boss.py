@@ -145,7 +145,7 @@ class Boss(pygame.sprite.Sprite):
     
     def update_phase(self):
         """Atualizar fase do boss baseado na vida"""
-        health_ratio = self.health / self.max_health
+        health_ratio = self.health / self.max_health if self.max_health > 0 else 0
         
         new_phase = 1
         if health_ratio < 0.66:

@@ -588,7 +588,7 @@ class Enemy(pygame.sprite.Sprite):
                         (bar_x, bar_y, bar_width, bar_height))
         
         # Vida atual
-        health_ratio = self.health / self.max_health
+        health_ratio = self.health / self.max_health if self.max_health > 0 else 0
         health_width = int(bar_width * health_ratio)
         health_color = (0, 255, 0) if health_ratio > 0.5 else (255, 255, 0) if health_ratio > 0.25 else (255, 0, 0)
         pygame.draw.rect(screen, health_color, 
@@ -711,7 +711,7 @@ class Enemy(pygame.sprite.Sprite):
         pygame.draw.polygon(screen, main_color, points)
         
         # Escudo frontal
-        if hasattr(self, 'shield_health') and self.shield_health > 0:
+        if hasattr(self, 'shield_health') and self.shield_health > 0 and self.max_shield > 0:
             shield_alpha = int(255 * (self.shield_health / self.max_shield))
             shield_size = self.width // 2 + 8
             

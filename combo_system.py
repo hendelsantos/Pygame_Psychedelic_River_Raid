@@ -207,7 +207,7 @@ class ComboSystem:
             pygame.draw.rect(screen, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height))
             
             # Barra preenchida
-            fill_width = int((self.combo_timer / self.combo_timeout) * bar_width)
+            fill_width = int((self.combo_timer / self.combo_timeout) * bar_width) if self.combo_timeout > 0 else 0
             bar_color = color if self.combo_timer > 0.5 else (255, 0, 0)
             pygame.draw.rect(screen, bar_color, (bar_x, bar_y, fill_width, bar_height))
             

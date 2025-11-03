@@ -163,7 +163,7 @@ class ProfessionalHUD:
         pygame.draw.rect(screen, (30, 30, 30), background_rect)
         
         # Barra preenchida com cor dinâmica
-        health_ratio = health / max_health
+        health_ratio = health / max_health if max_health > 0 else 0
         filled_width = int(bar_width * health_ratio)
         filled_rect = pygame.Rect(bar_x, bar_y, filled_width, bar_height)
         

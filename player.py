@@ -224,7 +224,7 @@ class Player(pygame.sprite.Sprite):
         
         # Desenhar escudo se ativo
         if self.shield > 0 and self.shield_max > 0:
-            shield_alpha = int(50 + (self.shield / self.shield_max) * 100)
+            shield_alpha = int(50 + (self.shield / self.shield_max) * 100) if self.shield_max > 0 else 50
             shield_color = (main_color[0], main_color[1], main_color[2], shield_alpha)  # RGBA para surface
             
             shield_surface = pygame.Surface((self.width + 20, self.height + 20), pygame.SRCALPHA)

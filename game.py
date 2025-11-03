@@ -1057,7 +1057,7 @@ class Game:
         # Barra de vida
         bar_width = 200
         bar_height = 15
-        health_ratio = self.player.health / self.player.max_health
+        health_ratio = self.player.health / self.player.max_health if self.player.max_health > 0 else 0
         
         # Texto de vida
         health_text = f"VIDA: {int(self.player.health)}/{self.player.max_health}"

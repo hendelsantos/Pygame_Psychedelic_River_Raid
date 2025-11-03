@@ -326,40 +326,12 @@ class PsychedelicEffects:
         
         return particles
     
-    def update_explosion_particles(self, particles, dt=1.0/60.0):
-        """Atualizar partículas de explosão"""
-        particles_to_remove = []
-        
-        for particle in particles:
-            # Partículas normais
-            if 'type' not in particle:
-                # Atualizar posição
-                particle['x'] += particle['vx']
-                particle['y'] += particle['vy']
-                particle['vy'] += particle['gravity']
-                
-                # Adicionar à trilha
-                if 'trail' in particle and len(particle['trail']) < 10:
-                    particle['trail'].append((particle['x'], particle['y']))
-                    if len(particle['trail']) > 10:
-                        particle['trail'].pop(0)
-                
-                # Reduzir vida
-                particle['life'] -= dt
-                
-            # Anéis de energia
-            elif particle['type'] == 'ring':
-                particle['radius'] += particle['expand_speed']
-                particle['life'] -= dt
-            
-            # Remover partículas mortas
+    def update_explosion_particles(self, particles, dt):
+        """Atualizar partículas de explosão espetaculares"""
+        for particle in particles[:]:  # Iterar sobre cópia
             if particle['life'] <= 0:
-                particles_to_remove.append(particle)
-        
-        for particle in particles_to_remove:
-            particles.remove(particle)
-        
-        return len(particles) > 0  # Retorna True se ainda há partículas
+                particles.remove(particle)
+                continue
     
     def draw_explosion_particles(self, screen, particles):
         """Desenhar partículas de explosão"""

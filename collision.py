@@ -201,11 +201,12 @@ class CollisionManager:
             
             particles.append(particle)
         
+        
         return particles
     
     def update_collision_particles(self, particles):
         """Atualizar partículas de colisão"""
-        for particle in particles[:]:
+        for particle in particles[:]:  # Iterar sobre cópia
             particle['x'] += particle['vel_x']
             particle['y'] += particle['vel_y']
             particle['life'] -= 1
