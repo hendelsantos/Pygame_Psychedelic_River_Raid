@@ -449,6 +449,10 @@ class Enemy(pygame.sprite.Sprite):
             self.draw_healer(screen)
         elif self.enemy_type == 'shield':
             self.draw_shield(screen)
+        elif self.enemy_type == 'giant':
+            self.draw_giant(screen)
+        elif self.enemy_type == 'elite':
+            self.draw_elite(screen)
         else:
             self.draw_basic(screen)
     
@@ -725,3 +729,118 @@ class Enemy(pygame.sprite.Sprite):
         
         # Contorno
         pygame.draw.polygon(screen, (100, 200, 255), points, 2)
+    def draw_giant(self, screen):
+        """Desenhar inimigo GIGANTE - Grande e ameaçador"""
+        # Atualizar animação
+        if not hasattr(self, 'rotation'):
+            self.rotation = 0
+        if not hasattr(self, 'pulse'):
+            self.pulse = 0
+            
+        self.rotation += 2
+        self.pulse += 0.1
+        
+        main_color = self.get_psychedelic_color()
+        
+        # Círculo externo pulsante
+        pulse_size = int(self.width // 2 + math.sin(self.pulse) * 10)
+        
+        # Desenhar múltiplos anéis concêntricos
+        for i in range(4):
+            ring_size = pulse_size - i * 8
+            if ring_size > 0:
+                alpha = 100 - i * 20
+                ring_surface = pygame.Surface((ring_size * 2, ring_size * 2), pygame.SRCALPHA)
+                ring_color = (*main_color, alpha)
+                pygame.draw.circle(ring_surface, ring_color, (ring_size, ring_size), ring_size, 3)
+                screen.blit(ring_surface, (self.x - ring_size, self.y - ring_size))
+        
+        # Corpo principal - círculo grande
+        pygame.draw.circle(screen, main_color, (int(self.x), int(self.y)), self.width // 2)
+        
+        # Núcleo central brilhante
+        core_size = self.width // 4
+        core_color = (255, 255, 255)
+        pygame.draw.circle(screen, core_color, (int(self.x), int(self.y)), core_size)
+        
+        # Espinhos rotativos
+        num_spikes = 8
+        for i in range(num_spikes):
+            angle = math.radians(self.rotation + i * (360 / num_spikes))
+            spike_length = self.width // 2 + 10
+            end_x = self.x + math.cos(angle) * spike_length
+            end_y = self.y + math.sin(angle) * spike_length
+            pygame.draw.line(screen, main_color, (int(self.x), int(self.y)), 
+                           (int(end_x), int(end_y)), 4)
+        
+        # Barra de vida
+        bar_width = self.width
+        bar_height = 6
+        health_ratio = self.health / self.max_health if self.max_health > 0 else 0
+        
+        # Fundo da barra
+        pygame.draw.rect(screen, (50, 50, 50),
+                        (self.x - bar_width // 2, self.y - self.height // 2 - 12,
+                         bar_width, bar_height))
+        
+        # Barra de vida colorida
+        health_color = (255, 50, 50) if health_ratio < 0.3 else (255, 200, 0) if health_ratio < 0.7 else (0, 255, 0)
+        pygame.draw.rect(screen, health_color,
+                        (self.x - bar_width // 2, self.y - self.height // 2 - 12,
+                         int(bar_width * health_ratio), bar_height))
+    
+    def draw_elite(self, screen):
+        """Desenhar inimigo ELITE - Rápido e perigoso"""
+        main_color = self.get_psychedelic_color()
+        
+        # Efeito de velocidade - rastros
+        trail_length = 5
+        for i in range(trail_length):
+            alpha = int(150 * (1 - i / trail_length))
+            trail_color = (*main_color, alpha)
+            trail_y = self.y + i * 8
+            trail_size = int(self.width * (1 - i / trail_length * 0.3))
+            
+            trail_surf = pygame.Surface((trail_size, trail_size), pygame.SRCALPHA)
+            pygame.draw.circle(trail_surf, trail_color, (trail_size // 2, trail_size // 2), trail_size // 2)
+            screen.blit(trail_surf, (self.x - trail_size // 2, trail_y - trail_size // 2))
+        
+        # Corpo principal - diamante duplo
+        points = [
+            (self.x, self.y - self.height // 2),  # Topo
+            (self.x + self.width // 2, self.y),   # Direita
+            (self.x, self.y + self.height // 2),  # Baixo
+            (self.x - self.width // 2, self.y),   # Esquerda
+        ]
+        pygame.draw.polygon(screen, main_color, points)
+        pygame.draw.polygon(screen, (255, 255, 255), points, 2)
+        
+        # Diamante interno menor
+        inner_size = 0.6
+        inner_points = [
+            (self.x, self.y - self.height // 2 * inner_size),
+            (self.x + self.width // 2 * inner_size, self.y),
+            (self.x, self.y + self.height // 2 * inner_size),
+            (self.x - self.width // 2 * inner_size, self.y),
+        ]
+        inner_color = tuple(min(255, int(c * 1.5)) for c in main_color)
+        pygame.draw.polygon(screen, inner_color, inner_points)
+        
+        # Núcleo central
+        pygame.draw.circle(screen, (255, 255, 255), (int(self.x), int(self.y)), 5)
+        
+        # Barra de vida
+        bar_width = self.width
+        bar_height = 5
+        health_ratio = self.health / self.max_health if self.max_health > 0 else 0
+        
+        # Fundo da barra
+        pygame.draw.rect(screen, (50, 50, 50),
+                        (self.x - bar_width // 2, self.y - self.height // 2 - 10,
+                         bar_width, bar_height))
+        
+        # Barra de vida com gradiente
+        health_color = (200, 0, 255) if health_ratio > 0.5 else (255, 0, 150)
+        pygame.draw.rect(screen, health_color,
+                        (self.x - bar_width // 2, self.y - self.height // 2 - 10,
+                         int(bar_width * health_ratio), bar_height))
