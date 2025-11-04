@@ -12,6 +12,8 @@ class ProfessionalHUD:
         self.large_font = pygame.font.Font(None, 56)
         self.medium_font = pygame.font.Font(None, 42)
         self.small_font = pygame.font.Font(None, 28)
+        self.font_small = pygame.font.Font(None, 22)
+        self.font_tiny = pygame.font.Font(None, 18)
         
         # Cores psicodélicas
         self.primary_color = (255, 255, 255)
@@ -311,6 +313,189 @@ class ProfessionalHUD:
         """Reativar dicas de controle"""
         self.controls_display_timer = 10.0
         self.show_controls = True
+    
+    def draw(self, screen, stats):
+        """
+        Desenhar HUD completa com todos os dados do jogo.
+        
+        Args:
+            screen: Superfície do pygame
+            stats: Dict com dados do jogo {
+                'score', 'level', 'health', 'max_health', 'bombs', 'max_bombs',
+                'xp_progress', 'missions', 'mode_icon', 'mode_name', 'time_display',
+                'coins', 'player_level', 'rank_name', 'points_to_next', 'boss_next',
+                'bomb_active', 'show_fps', 'fps', 'color_shift'
+            }
+        """
+        # Extrair dados
+        score = stats.get('score', 0)
+        level = stats.get('level', 1)
+        health = stats.get('health', 100)
+        max_health = stats.get('max_health', 300)
+        bombs = stats.get('bombs', 0)
+        max_bombs = stats.get('max_bombs', 3)
+        xp_progress = stats.get('xp_progress', 0.0)
+        missions = stats.get('missions', [])
+        mode_icon = stats.get('mode_icon', '🎮')
+        mode_name = stats.get('mode_name', 'ARCADE')
+        time_display = stats.get('time_display', None)
+        coins = stats.get('coins', 0)
+        player_level = stats.get('player_level', 1)
+        rank_name = stats.get('rank_name', 'Novato')
+        points_to_next = stats.get('points_to_next', 5000)
+        boss_next = stats.get('boss_next', False)
+        bomb_active = stats.get('bomb_active', False)
+        show_fps = stats.get('show_fps', False)
+        fps = stats.get('fps', 0)
+        self.color_shift = stats.get('color_shift', 0.0)
+        
+        # ============================================
+        # CANTO SUPERIOR ESQUERDO - Score e Level
+        # ============================================
+        y_pos = 10
+        
+        # Modo de jogo (ícone + nome)
+        mode_text = f"{mode_icon} {mode_name}"
+        mode_surf = self.font_small.render(mode_text, True, (255, 200, 100))
+        screen.blit(mode_surf, (10, y_pos))
+        y_pos += 25
+        
+        # Timer (se houver)
+        if time_display is not None:
+            timer_text = f"⏱️ {time_display}"
+            timer_color = (255, 100, 100) if "0:" in time_display else (255, 255, 255)
+            timer_surf = self.font_small.render(timer_text, True, timer_color)
+            screen.blit(timer_surf, (10, y_pos))
+            y_pos += 25
+        
+        # Score
+        score_text = f"PONTOS: {score:,}"
+        score_surf = self.font_small.render(score_text, True, (255, 255, 100))
+        screen.blit(score_surf, (10, y_pos))
+        y_pos += 25
+        
+        # Level do jogo
+        game_level_text = f"FASE: {level}"
+        game_level_surf = self.font_small.render(game_level_text, True, (100, 200, 255))
+        screen.blit(game_level_surf, (10, y_pos))
+        y_pos += 20
+        
+        # Progresso até próximo nível
+        progress_text = f"Próximo: {points_to_next:,} pts"
+        progress_surf = self.font_tiny.render(progress_text, True, (150, 150, 150))
+        screen.blit(progress_surf, (10, y_pos))
+        y_pos += 18
+        
+        # Indicador de boss
+        if boss_next:
+            boss_text = f"🐉 BOSS no Nível {level + 1}!"
+            boss_surf = self.font_tiny.render(boss_text, True, (255, 100, 100))
+            screen.blit(boss_surf, (10, y_pos))
+            y_pos += 18
+        
+        y_pos += 10
+        
+        # Moedas
+        coins_text = f"💰 {coins}"
+        coins_surf = self.font_small.render(coins_text, True, (255, 215, 0))
+        screen.blit(coins_surf, (10, y_pos))
+        y_pos += 25
+        
+        # Dica da loja
+        shop_hint = "TAB/S: Loja"
+        shop_surf = self.font_tiny.render(shop_hint, True, (200, 200, 100))
+        screen.blit(shop_surf, (10, y_pos))
+        y_pos += 25
+        
+        # ⚛️ BOMBAS ATÔMICAS
+        bombs_text = f"⚛️  BOMBAS: {bombs}/{max_bombs}"
+        bombs_color = (255, 100, 255) if bombs > 0 else (100, 100, 100)
+        bombs_surf = self.font_small.render(bombs_text, True, bombs_color)
+        screen.blit(bombs_surf, (10, y_pos))
+        y_pos += 20
+        
+        # Dica da bomba
+        if bomb_active:
+            bomb_hint = "Bomba ativa - explode no topo!"
+            bomb_hint_color = (255, 255, 0)
+        else:
+            bomb_hint = "B: Disparar Bomba"
+            bomb_hint_color = (200, 100, 200)
+        
+        bomb_hint_surf = self.font_tiny.render(bomb_hint, True, bomb_hint_color)
+        screen.blit(bomb_hint_surf, (10, y_pos))
+        y_pos += 25
+        
+        # ============================================
+        # ESQUERDA - Progressão (Nível e XP)
+        # ============================================
+        player_level_text = f"NÍVEL {player_level}"
+        player_level_surf = self.font_small.render(player_level_text, True, (255, 150, 255))
+        screen.blit(player_level_surf, (10, y_pos))
+        y_pos += 20
+        
+        # Rank
+        rank_text = f"{rank_name}"
+        rank_surf = self.font_tiny.render(rank_text, True, (200, 150, 200))
+        screen.blit(rank_surf, (10, y_pos))
+        y_pos += 20
+        
+        # Barra de XP compacta
+        xp_bar_width = 150
+        xp_bar_height = 8
+        pygame.draw.rect(screen, (50, 50, 50), (10, y_pos, xp_bar_width, xp_bar_height))
+        pygame.draw.rect(screen, (150, 100, 255), (10, y_pos, int(xp_bar_width * xp_progress), xp_bar_height))
+        pygame.draw.rect(screen, (200, 150, 255), (10, y_pos, xp_bar_width, xp_bar_height), 1)
+        
+        # ============================================
+        # CANTO SUPERIOR DIREITO - Vida e FPS
+        # ============================================
+        right_x = self.width - 220
+        y_pos = 10
+        
+        # Barra de vida
+        bar_width = 200
+        bar_height = 15
+        health_ratio = health / max_health if max_health > 0 else 0
+        
+        # Texto de vida
+        health_text = f"VIDA: {int(health)}/{max_health}"
+        health_surf = self.font_tiny.render(health_text, True, (255, 255, 255))
+        screen.blit(health_surf, (right_x, y_pos))
+        y_pos += 18
+        
+        # Barra
+        pygame.draw.rect(screen, (80, 0, 0), (right_x, y_pos, bar_width, bar_height))
+        health_color = self.get_psychedelic_color(self.color_shift)
+        pygame.draw.rect(screen, health_color, (right_x, y_pos, int(bar_width * health_ratio), bar_height))
+        pygame.draw.rect(screen, (255, 255, 255), (right_x, y_pos, bar_width, bar_height), 2)
+        y_pos += 25
+        
+        # FPS (se habilitado)
+        if show_fps and fps > 0:
+            fps_text = f"FPS: {int(fps)}"
+            fps_surf = self.font_tiny.render(fps_text, True, (150, 150, 150))
+            screen.blit(fps_surf, (right_x, y_pos))
+            y_pos += 25
+        
+        # ============================================
+        # DIREITA - Missões Diárias (compactas)
+        # ============================================
+        missions_title = "MISSÕES DIÁRIAS"
+        missions_title_surf = self.font_tiny.render(missions_title, True, (255, 200, 100))
+        screen.blit(missions_title_surf, (right_x, y_pos))
+        y_pos += 18
+        
+        for mission in missions:
+            # Ícone de status
+            status_icon = "✓" if mission.get('completed', False) else "○"
+            color = (100, 255, 100) if mission.get('completed', False) else (180, 180, 180)
+            
+            # Texto compacto
+            mission_text = f"{status_icon} {mission.get('progress', 0)}/{mission.get('target', 1)}"
+            mission_surf = self.font_tiny.render(mission_text, True, color)
+            screen.blit(mission_surf, (right_x + 10, y_pos))
+            y_pos += 16
     
     def force_show_controls(self, show=True):
         """Forçar mostrar ou esconder dicas de controle"""

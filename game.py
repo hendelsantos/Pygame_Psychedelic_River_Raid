@@ -3,6 +3,7 @@ import math
 import random
 import colorsys
 import time
+import json
 from player import Player
 from enemy import Enemy
 from bullet import Bullet
@@ -38,6 +39,20 @@ class Game:
         
         # Sistema de save
         self.save_system = save_system if save_system else SaveSystem()
+        
+        # Carregar configuração externa
+        try:
+            with open('config.json', 'r') as f:
+                self.config = json.load(f)
+        except FileNotFoundError:
+            print("config.json não encontrado, usando valores padrão")
+            self.config = {
+                "player": {"base_speed": 5, "invulnerable_duration_frames": 30},
+                "difficulty": {"points_per_level": 5000, "spawn_base_interval": 80, "spawn_min_interval": 15, "spawn_level_reduction_factor": 1.5},
+                "damage": {"enemy_bullet": 5, "terrain_collision": 8, "enemy_collision": 10},
+                "rewards": {"coin_min_per_kill": 2, "coin_max_per_kill": 5, "xp_per_kill": 10, "xp_per_boss": 200},
+                "atomic_bomb": {"damage_to_boss": 30}
+            }
         
         # Sistema de modo de jogo
         self.mode_manager = GameModeManager()
@@ -331,8 +346,8 @@ class Game:
         # Aumentar pontuação baseada na sobrevivência (com multiplicador)
         self.add_score(1)
         
-        # Aumentar nível a cada 5000 pontos
-        new_level = (self.score // 5000) + 1
+        # Aumentar nível baseado em pontos configuráveis
+        new_level = (self.score // self.config['difficulty']['points_per_level']) + 1
         if new_level > self.level:
             self.level = new_level
             self.game_speed = min(8.0, 2 + (self.level * 0.3))
@@ -649,108 +664,110 @@ class Game:
         # Contabilizar power-up coletado
         self.powerups_collected += 1
     
+    def on_enemy_destroyed(self, enemy_type, enemy_pos, is_splitter=False):
+        """
+        Processa a destruição de um inimigo (SRP: Single Responsibility Principle).
+        Lida com score, XP, moedas, sons, explosões e splitters.
+        """
+        # Pontuação baseada no tipo
+        base_points = {
+            'giant': 1000,
+            'elite': 750,
+            'tank': 500,
+        }.get(enemy_type, 100)
+        
+        self.add_score(base_points)
+        self.enemies_killed += 1
+        
+        # Sistema de combo
+        self.combo.add_kill(time.time(), enemy_pos)
+        self.session_stats['kills'] += 1
+        self.session_stats['shots_hit'] += 1
+        
+        # XP com multiplicador de combo
+        xp_gain = int(self.config['rewards']['xp_per_kill'] * self.combo.get_multiplier())
+        leveled_up, levels_gained = self.progression.add_xp(xp_gain)
+        
+        if leveled_up:
+            # Verificar desbloqueios de skins
+            new_skins = self.skin_system.check_unlocks(
+                self.progression.player_level,
+                self.progression.prestige_level
+            )
+            # Som especial de level up
+            self.audio.play_sound('powerup')
+        
+        # Sistema de moedas (configurável + upgrades + combo)
+        coin_multiplier = 1.0 + (self.save_system.get_upgrade_level('coin_multiplier') * 0.1)
+        coin_multiplier *= self.combo.get_multiplier()
+        coins = int(random.randint(
+            self.config['rewards']['coin_min_per_kill'], 
+            self.config['rewards']['coin_max_per_kill']
+        ) * coin_multiplier)
+        
+        # Bônus de moedas para inimigos grandes
+        coin_bonus = {
+            'giant': 10,
+            'elite': 5,
+            'tank': 3
+        }.get(enemy_type, 1)
+        coins *= coin_bonus
+        
+        self.coins_earned_this_game += coins
+        
+        # Som de impacto
+        self.audio.play_sound('enemy_hit')
+        
+        # Explosões baseadas no tipo de inimigo
+        if enemy_type in ['giant', 'elite']:
+            size_mult = 3.0 if enemy_type == 'giant' else 2.0
+            giant_particles = self.effects.create_giant_explosion(
+                enemy_pos[0], enemy_pos[1], size_mult
+            )
+            self.explosion_particles.extend(giant_particles)
+        elif enemy_type == 'tank':
+            tank_particles = self.effects.create_giant_explosion(
+                enemy_pos[0], enemy_pos[1], 1.5
+            )
+            self.explosion_particles.extend(tank_particles)
+        else:
+            self.create_explosion(enemy_pos, (255, 100, 0))
+        
+        # Lógica do splitter
+        if is_splitter:
+            for i in range(2):
+                angle = random.uniform(-math.pi/4, math.pi/4)
+                offset_x = 30 * math.cos(angle)
+                offset_y = 30 * math.sin(angle)
+                
+                new_enemy = Enemy(
+                    enemy_pos[0] + offset_x,
+                    enemy_pos[1] + offset_y,
+                    random.choice(['basic', 'fast'])
+                )
+                # Inimigos divididos não podem se dividir novamente
+                new_enemy.splits_enabled = False
+                self.enemies.add(new_enemy)
+    
     def check_collisions(self):
-        """Verificar todas as colisões do jogo"""
+        """Verificar todas as colisões do jogo (SRP: apenas detecção)"""
         # Projéteis do jogador atingindo inimigos
         hits = pygame.sprite.groupcollide(self.bullets, self.enemies, True, False)
         for bullet, enemies_hit in hits.items():
             for enemy in enemies_hit:
-                # Salvar informações do inimigo antes de matar
+                # Coletar informações antes de remover
                 enemy_type = enemy.enemy_type
                 enemy_pos = enemy.rect.center
-                enemy_size = max(enemy.width, enemy.height)
-                
-                # Verificar se é splitter antes de matar
                 is_splitter = (enemy.enemy_type == 'splitter' and 
                              hasattr(enemy, 'splits_enabled') and 
                              enemy.splits_enabled and 
                              enemy.can_split())
                 
-                # Remover o inimigo
+                # Remover inimigo
                 enemy.kill()
                 
-                # Pontuação e estatísticas
-                base_points = 100
-                if enemy_type == 'giant':
-                    base_points = 1000
-                elif enemy_type == 'elite':
-                    base_points = 750
-                elif enemy_type == 'tank':
-                    base_points = 500
-                
-                self.add_score(base_points)
-                self.enemies_killed += 1
-                
-                # 🎮 ADICIONAR KILL AO COMBO
-                self.combo.add_kill(time.time(), enemy_pos)
-                self.session_stats['kills'] += 1
-                self.session_stats['shots_hit'] += 1
-                
-                # 🌟 ADICIONAR XP (10 XP base * multiplicador do combo)
-                xp_gain = int(10 * self.combo.get_multiplier())
-                leveled_up, levels_gained = self.progression.add_xp(xp_gain)
-                
-                # Verificar level up e desbloqueios
-                if leveled_up:
-                            # Verificar desbloqueios de skins
-                    new_skins = self.skin_system.check_unlocks(
-                        self.progression.player_level,
-                        self.progression.prestige_level
-                    )
-                    # Som especial de level up
-                    self.audio.play_sound('powerup')
-                
-                # Ganhar moedas (1-3 moedas por inimigo, mais com upgrade e combo)
-                coin_multiplier = 1.0 + (self.save_system.get_upgrade_level('coin_multiplier') * 0.1)
-                coin_multiplier *= self.combo.get_multiplier()  # Combo também aumenta moedas!
-                coins = int(random.randint(1, 3) * coin_multiplier)
-                
-                # Inimigos grandes dão MUITO mais moedas!
-                if enemy_type == 'giant':
-                    coins *= 10
-                elif enemy_type == 'elite':
-                    coins *= 5
-                elif enemy_type == 'tank':
-                    coins *= 3
-                
-                self.coins_earned_this_game += coins
-                
-                # Som de inimigo sendo atingido
-                self.audio.play_sound('enemy_hit')
-                
-                # 🎆 EXPLOSÕES ESPETACULARES PARA INIMIGOS GRANDES! 🎆
-                if enemy_type in ['giant', 'elite']:
-                    # EXPLOSÃO GIGANTE PSICODÉLICA!!!
-                    size_mult = 3.0 if enemy_type == 'giant' else 2.0
-                    giant_particles = self.effects.create_giant_explosion(
-                        enemy_pos[0], enemy_pos[1], size_mult
-                    )
-                    self.explosion_particles.extend(giant_particles)
-                elif enemy_type == 'tank':
-                    # Explosão grande
-                    tank_particles = self.effects.create_giant_explosion(
-                        enemy_pos[0], enemy_pos[1], 1.5
-                    )
-                    self.explosion_particles.extend(tank_particles)
-                else:
-                    # Explosão normal
-                    self.create_explosion(enemy_pos, (255, 100, 0))
-                
-                # Splitter se divide em 2 inimigos menores
-                if is_splitter:
-                    for i in range(2):
-                        angle = random.uniform(-math.pi/4, math.pi/4)
-                        offset_x = 30 * math.cos(angle)
-                        offset_y = 30 * math.sin(angle)
-                        
-                        new_enemy = Enemy(
-                            enemy_pos[0] + offset_x,
-                            enemy_pos[1] + offset_y,
-                            random.choice(['basic', 'fast'])
-                        )
-                        # Inimigos divididos não podem se dividir novamente
-                        new_enemy.splits_enabled = False
-                        self.enemies.add(new_enemy)
+                # Delegar processamento para método especializado
+                self.on_enemy_destroyed(enemy_type, enemy_pos, is_splitter)
         
         # Projéteis do jogador atingindo o boss
         if self.boss_active and self.boss:
@@ -775,7 +792,7 @@ class Game:
         
         # Verificar colisão com obstáculos do terreno (rochas, cristais, esferas de energia)
         if not self.invulnerable and self.collision_manager.check_terrain_collision(self.player, self.level_generator):
-            self.player.take_damage(8)  # Dano REDUZIDO (era 30)
+            self.player.take_damage(self.config['damage']['terrain_collision'])  # Dano REDUZIDO (era 30)
             # Som de explosão quando jogador bate em obstáculo
             self.audio.play_sound('explosion')
             # Vibração ao colidir
@@ -792,7 +809,7 @@ class Game:
         if not self.invulnerable:
             hits = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
             if hits:
-                self.player.take_damage(5)  # Dano REDUZIDO (era 20)
+                self.player.take_damage(self.config['damage']['enemy_bullet'])  # Dano REDUZIDO (era 20)
                 # Som de explosão quando jogador é atingido
                 self.audio.play_sound('explosion')
                 # Vibração ao tomar dano
@@ -807,7 +824,7 @@ class Game:
         if not self.invulnerable:
             hits = pygame.sprite.spritecollide(self.player, self.enemies, True)
             if hits:
-                self.player.take_damage(10)  # Dano REDUZIDO (era 30)
+                self.player.take_damage(self.config['damage']['enemy_collision'])  # Dano REDUZIDO (era 30)
                 self.enemies_killed += len(hits)
                 # Som de explosão grande quando colide com inimigo
                 self.audio.play_sound('explosion')
@@ -832,11 +849,12 @@ class Game:
         explosion_y = max(50, min(self.height - 50, self.atomic_bomb_y))  # Centralizar na tela
         
         # 🌟 EXPLOSÃO ÉPICA PRINCIPAL (GIGANTESCA!)
-        self.effects.create_giant_explosion(
+        giant_particles = self.effects.create_giant_explosion(
             self.atomic_bomb_x, 
             explosion_y, 
-            size_multiplier=20.0  # ABSOLUTAMENTE MASSIVA!!!
+            size_multiplier=12.0  # MEGA explosão
         )
+        self.explosion_particles.extend(giant_particles)
         
         # 💥 CRIAR 8 EXPLOSÕES ORBITAIS (como no boss)
         for i in range(8):
@@ -845,11 +863,12 @@ class Game:
             orbit_x = self.atomic_bomb_x + math.cos(angle) * orbit_distance
             orbit_y = explosion_y + math.sin(angle) * orbit_distance
             
-            self.effects.create_giant_explosion(
+            orbital_particles = self.effects.create_giant_explosion(
                 orbit_x,
                 orbit_y,
                 size_multiplier=8.0  # Explosões grandes orbitais
             )
+            self.explosion_particles.extend(orbital_particles)
         
         # 🎆 CRIAR ONDAS DE CHOQUE EXPANDINDO
         for wave in range(5):
@@ -970,188 +989,163 @@ class Game:
             pygame.draw.circle(self.screen, color, 
                              (int(particle['x']), int(particle['y'])), size)
     
-    def draw_hud(self):
-        """Desenhar interface do usuário profissional - VERSÃO LIMPA E ORGANIZADA"""
-        font_small = pygame.font.Font(None, 22)
-        font_tiny = pygame.font.Font(None, 18)
+    def draw_atomic_missile(self):
+        """Desenhar míssil atômico com todos os efeitos visuais"""
+        # Animação de pulsação
+        pulse = math.sin(pygame.time.get_ticks() / 80) * 3
         
-        # Pegar dados do modo de jogo
-        mode_icon = self.mode_manager.get_mode_icon()
-        mode_name = self.mode_manager.get_mode_name()
-        time_display = self.mode_manager.get_time_display()
+        # ⚠️ EFEITO DE PISCAR (quanto mais perto do topo, mais rápido pisca)
+        blink_speed = 150  # Começa piscando devagar
+        if self.atomic_bomb_y < 100:  # Quando está próximo do topo
+            blink_speed = 50  # Pisca RÁPIDO (alerta!)
+        blink = (pygame.time.get_ticks() // blink_speed) % 2 == 0
         
-        # ============================================
-        # CANTO SUPERIOR ESQUERDO - Score e Level
-        # ============================================
-        y_pos = 10
-        
-        # Modo de jogo (ícone + nome)
-        mode_text = f"{mode_icon} {mode_name}"
-        mode_surf = font_small.render(mode_text, True, (255, 200, 100))
-        self.screen.blit(mode_surf, (10, y_pos))
-        y_pos += 25
-        
-        # Timer (se houver)
-        if self.mode_manager.time_remaining is not None:
-            timer_text = f"⏱️ {time_display}"
-            timer_color = (255, 100, 100) if self.mode_manager.time_remaining < 30 else (255, 255, 255)
-            timer_surf = font_small.render(timer_text, True, timer_color)
-            self.screen.blit(timer_surf, (10, y_pos))
-            y_pos += 25
-        
-        # Score
-        score_text = f"PONTOS: {self.score:,}"
-        score_surf = font_small.render(score_text, True, (255, 255, 100))
-        self.screen.blit(score_surf, (10, y_pos))
-        y_pos += 25
-        
-        # Level do jogo
-        game_level_text = f"FASE: {self.level}"
-        game_level_surf = font_small.render(game_level_text, True, (100, 200, 255))
-        self.screen.blit(game_level_surf, (10, y_pos))
-        y_pos += 20
-        
-        # Progresso até próximo nível e boss
-        points_to_next = 5000 - (self.score % 5000)
-        next_level = self.level + 1
-        progress_text = f"Próximo: {points_to_next:,} pts"
-        progress_surf = font_tiny.render(progress_text, True, (150, 150, 150))
-        self.screen.blit(progress_surf, (10, y_pos))
-        y_pos += 18
-        
-        # Indicador de boss
-        if (next_level % 5) == 0:
-            boss_text = f"🐉 BOSS no Nível {next_level}!"
-            boss_surf = font_tiny.render(boss_text, True, (255, 100, 100))
-            self.screen.blit(boss_surf, (10, y_pos))
-            y_pos += 18
-        
-        y_pos += 10
-        
-        # Moedas
-        coins_text = f"💰 {self.coins_earned_this_game}"
-        coins_surf = font_small.render(coins_text, True, (255, 215, 0))
-        self.screen.blit(coins_surf, (10, y_pos))
-        y_pos += 25
-        
-        # Dica da loja
-        shop_hint = "TAB/S: Loja"
-        shop_surf = font_tiny.render(shop_hint, True, (200, 200, 100))
-        self.screen.blit(shop_surf, (10, y_pos))
-        y_pos += 25
-        
-        # ⚛️ BOMBAS ATÔMICAS
-        bombs_text = f"⚛️  BOMBAS: {self.atomic_bombs}/{self.max_atomic_bombs}"
-        bombs_color = (255, 100, 255) if self.atomic_bombs > 0 else (100, 100, 100)
-        bombs_surf = font_small.render(bombs_text, True, bombs_color)
-        self.screen.blit(bombs_surf, (10, y_pos))
-        y_pos += 20
-        
-        # Dica da bomba
-        if self.atomic_bomb_active:
-            bomb_hint = "Bomba ativa - explode no topo!"
-            bomb_hint_color = (255, 255, 0)  # Amarelo brilhante quando ativa!
+        # Se não estiver piscando (off), desenha transparente/escuro
+        if not blink and self.atomic_bomb_y < 100:
+            # Míssil pisca quando está perto de explodir!
+            brightness = 0.3  # Escurecido
         else:
-            bomb_hint = "B: Disparar Bomba"
-            bomb_hint_color = (200, 100, 200)
+            brightness = 1.0  # Normal/brilhante
         
-        bomb_hint_surf = font_tiny.render(bomb_hint, True, bomb_hint_color)
-        self.screen.blit(bomb_hint_surf, (10, y_pos))
-        y_pos += 25
+        # CORPO DO MÍSSIL (retângulo gordo)
+        missile_width = 30  # GORDO!
+        missile_height = 60  # LONGO!
+        missile_x = int(self.atomic_bomb_x - missile_width/2)
+        missile_y = int(self.atomic_bomb_y - missile_height/2)
         
-        # ============================================
-        # ESQUERDA - Progressão (Nível e XP)
-        # ============================================
-        # Nível do jogador
-        player_level_text = f"NÍVEL {self.progression.player_level}"
-        player_level_surf = font_small.render(player_level_text, True, (255, 150, 255))
-        self.screen.blit(player_level_surf, (10, y_pos))
-        y_pos += 20
+        # Corpo principal do míssil (cinza metálico com brightness)
+        body_color = tuple(int(c * brightness) for c in (150, 150, 150))
+        pygame.draw.rect(self.screen, body_color,
+                       (missile_x, missile_y, missile_width, missile_height))
         
-        # Rank
-        rank_text = f"{self.progression.get_rank_name()}"
-        rank_surf = font_tiny.render(rank_text, True, (200, 150, 200))
-        self.screen.blit(rank_surf, (10, y_pos))
-        y_pos += 20
+        # Borda brilhante do míssil (também pisca)
+        border_color = tuple(int(c * brightness) for c in (200, 200, 255))
+        pygame.draw.rect(self.screen, border_color,
+                       (missile_x, missile_y, missile_width, missile_height), 3)
         
-        # Barra de XP compacta
-        xp_progress = self.progression.get_xp_progress()
-        xp_bar_width = 150
-        xp_bar_height = 8
-        pygame.draw.rect(self.screen, (50, 50, 50), (10, y_pos, xp_bar_width, xp_bar_height))
-        pygame.draw.rect(self.screen, (150, 100, 255), (10, y_pos, int(xp_bar_width * xp_progress), xp_bar_height))
-        pygame.draw.rect(self.screen, (200, 150, 255), (10, y_pos, xp_bar_width, xp_bar_height), 1)
+        # OGIVA (ponta triangular) - PISCA EM VERMELHO BRILHANTE quando perto do topo
+        nose_points = [
+            (int(self.atomic_bomb_x), int(self.atomic_bomb_y - missile_height/2 - 20)),  # Ponta
+            (missile_x, missile_y),  # Esquerda
+            (missile_x + missile_width, missile_y)  # Direita
+        ]
+        if self.atomic_bomb_y < 100 and blink:
+            nose_color = (255, 255, 0)  # AMARELO BRILHANTE (alerta!)
+        else:
+            nose_color = tuple(int(c * brightness) for c in (255, 100, 100))
+        pygame.draw.polygon(self.screen, nose_color, nose_points)
+        pygame.draw.polygon(self.screen, tuple(int(c * brightness) for c in (255, 200, 200)), nose_points, 2)
         
-        # ============================================
-        # CANTO SUPERIOR DIREITO - Vida e FPS
-        # ============================================
-        right_x = self.width - 220
-        y_pos = 10
+        # ALETAS (base do míssil)
+        fin_height = 15
+        fin_y = missile_y + missile_height
+        # Aleta esquerda
+        left_fin = [
+            (missile_x, fin_y),
+            (missile_x - 12, fin_y + fin_height),
+            (missile_x, fin_y + fin_height)
+        ]
+        fin_color = tuple(int(c * brightness) for c in (180, 180, 200))
+        fin_border = tuple(int(c * brightness) for c in (220, 220, 255))
+        pygame.draw.polygon(self.screen, fin_color, left_fin)
+        pygame.draw.polygon(self.screen, fin_border, left_fin, 2)
         
-        # Barra de vida
-        bar_width = 200
-        bar_height = 15
-        health_ratio = self.player.health / self.player.max_health if self.player.max_health > 0 else 0
+        # Aleta direita
+        right_fin = [
+            (missile_x + missile_width, fin_y),
+            (missile_x + missile_width + 12, fin_y + fin_height),
+            (missile_x + missile_width, fin_y + fin_height)
+        ]
+        pygame.draw.polygon(self.screen, fin_color, right_fin)
+        pygame.draw.polygon(self.screen, fin_border, right_fin, 2)
         
-        # Texto de vida
-        health_text = f"VIDA: {int(self.player.health)}/{self.player.max_health}"
-        health_surf = font_tiny.render(health_text, True, (255, 255, 255))
-        self.screen.blit(health_surf, (right_x, y_pos))
-        y_pos += 18
+        # ⚠️ SÍMBOLO DE RADIAÇÃO no centro - PISCA INTENSAMENTE perto do topo!
+        symbol_size = 8 + pulse
+        if self.atomic_bomb_y < 100 and blink:
+            # Quando perto do topo E piscando, símbolo fica VERMELHO BRILHANTE
+            symbol_color = (255, 0, 0)
+            symbol_center = (0, 0, 0)
+        else:
+            # Normal: amarelo
+            symbol_color = tuple(int(c * brightness) for c in (255, 255, 0))
+            symbol_center = tuple(int(c * brightness) for c in (0, 0, 0))
         
-        # Barra
-        pygame.draw.rect(self.screen, (80, 0, 0), (right_x, y_pos, bar_width, bar_height))
-        health_color = self.get_psychedelic_color(self.color_shift)
-        pygame.draw.rect(self.screen, health_color, (right_x, y_pos, int(bar_width * health_ratio), bar_height))
-        pygame.draw.rect(self.screen, (255, 255, 255), (right_x, y_pos, bar_width, bar_height), 2)
-        y_pos += 25
+        pygame.draw.circle(self.screen, symbol_color,
+                         (int(self.atomic_bomb_x), int(self.atomic_bomb_y)),
+                         int(symbol_size))
+        pygame.draw.circle(self.screen, symbol_center,
+                         (int(self.atomic_bomb_x), int(self.atomic_bomb_y)),
+                         int(symbol_size * 0.5))
         
-        # FPS (se habilitado)
-        if self.save_system.get_setting('show_fps', False):
-            fps = self.clock.get_fps()
-            fps_text = f"FPS: {int(fps)}"
-            fps_surf = font_tiny.render(fps_text, True, (150, 150, 150))
-            self.screen.blit(fps_surf, (right_x, y_pos))
-            y_pos += 25
+        # Faixas de advertência (amarelo e preto) - também piscam
+        stripe_y = missile_y + 15
+        for i in range(3):
+            stripe_y_pos = stripe_y + (i * 15)
+            if i % 2 == 0:
+                stripe_color = tuple(int(c * brightness) for c in (255, 255, 0))
+                pygame.draw.rect(self.screen, stripe_color,
+                               (missile_x + 2, stripe_y_pos, missile_width - 4, 6))
+            else:
+                stripe_color = tuple(int(c * brightness) for c in (0, 0, 0))
+                pygame.draw.rect(self.screen, stripe_color,
+                               (missile_x + 2, stripe_y_pos, missile_width - 4, 6))
         
-        # ============================================
-        # DIREITA - Missões Diárias (compactas)
-        # ============================================
-        missions_title = "MISSÕES DIÁRIAS"
-        missions_title_surf = font_tiny.render(missions_title, True, (255, 200, 100))
-        self.screen.blit(missions_title_surf, (right_x, y_pos))
-        y_pos += 18
-        
-        for mission in self.daily_missions.get_missions():
-            # Ícone de status
-            status_icon = "✓" if mission['completed'] else "○"
-            color = (100, 255, 100) if mission['completed'] else (180, 180, 180)
+        # PROPULSÃO - Trail de fogo e fumaça (não pisca, sempre ativa)
+        trail_start_y = missile_y + missile_height + fin_height
+        for i in range(20):
+            trail_y = trail_start_y + (i * 8)
+            trail_width = missile_width - (i * 1.2)
+            trail_alpha = 255 - (i * 12)
             
-            # Texto compacto
-            mission_text = f"{status_icon} {mission['progress']}/{mission['target']}"
-            mission_surf = font_tiny.render(mission_text, True, color)
-            self.screen.blit(mission_surf, (right_x + 10, y_pos))
-            y_pos += 16
+            if trail_width > 0 and trail_y < self.height:
+                # Fogo alaranjado/amarelo
+                if i < 5:
+                    color = (255, 255 - i*40, 0)  # Amarelo -> Laranja
+                elif i < 10:
+                    color = (255 - (i-5)*30, 100, 0)  # Laranja -> Vermelho
+                else:
+                    color = (150 - (i-10)*10, 50, 50)  # Vermelho escuro -> Fumaça
+                
+                pygame.draw.ellipse(self.screen, color,
+                                  (int(self.atomic_bomb_x - trail_width/2),
+                                   int(trail_y),
+                                   int(trail_width),
+                                   12))
         
-        # ============================================
-        # INFERIOR ESQUERDO - Controles (se visível)
-        # ============================================
-        if hasattr(self.hud, 'controls_visible') and self.hud.controls_visible:
-            controls_y = self.height - 120
-            controls = [
-                "WASD/Setas: Mover",
-                "Space: Atirar",
-                "TAB/S: Loja",
-                "P: Pausar"
-            ]
-            for i, control in enumerate(controls):
-                control_surf = font_tiny.render(control, True, (150, 150, 150))
-                self.screen.blit(control_surf, (10, controls_y + i * 16))
-        
-        # ============================================
-        # INFERIOR DIREITO - Mini-mapa (opcional)
-        # ============================================
-        # Removido para evitar poluição visual
+        # Partículas de faísca ao redor da propulsão
+        for angle in range(0, 360, 45):
+            rad = math.radians(angle + pygame.time.get_ticks() / 15)
+            spark_distance = 25 + pulse
+            particle_x = self.atomic_bomb_x + math.cos(rad) * spark_distance
+            particle_y = trail_start_y + 10 + math.sin(rad) * spark_distance
+            pygame.draw.circle(self.screen, (255, 255, 100),
+                             (int(particle_x), int(particle_y)), 3)
+    
+    def draw_hud(self):
+        """Coletar dados e delegar desenho para ProfessionalHUD"""
+        stats = {
+            'score': self.score,
+            'level': self.level,
+            'health': self.player.health,
+            'max_health': self.player.max_health,
+            'bombs': self.atomic_bombs,
+            'max_bombs': self.max_atomic_bombs,
+            'xp_progress': self.progression.get_xp_progress(),
+            'missions': self.daily_missions.get_missions(),
+            'mode_icon': self.mode_manager.get_mode_icon(),
+            'mode_name': self.mode_manager.get_mode_name(),
+            'time_display': self.mode_manager.get_time_display(),
+            'coins': self.coins_earned_this_game,
+            'player_level': self.progression.player_level,
+            'rank_name': self.progression.get_rank_name(),
+            'points_to_next': self.config['difficulty']['points_per_level'] - (self.score % self.config['difficulty']['points_per_level']),
+            'boss_next': ((self.level + 1) % 5) == 0,
+            'bomb_active': self.atomic_bomb_active,
+            'show_fps': self.save_system.get_setting('show_fps', False),
+            'fps': self.clock.get_fps(),
+            'color_shift': self.color_shift
+        }
+        self.hud.draw(self.screen, stats)
     
     def get_psychedelic_color(self, hue_shift):
         """Gerar cor psicodélica baseada no tempo"""
@@ -1400,7 +1394,7 @@ class Game:
         self.skin_system.render_effects(self.screen, self.player.rect)
         
         # Desenhar sprites (aplicar shake offset se necessário)
-        self.player.draw(self.screen)
+        self.player.draw(self.screen, self.invulnerable)
         for enemy in self.enemies:
             enemy.draw(self.screen)
         
@@ -1418,135 +1412,7 @@ class Game:
         
         # 🚀 DESENHAR MÍSSIL ATÔMICO SE ESTIVER ATIVO
         if self.atomic_bomb_active:
-            # Animação de pulsação
-            pulse = math.sin(pygame.time.get_ticks() / 80) * 3
-            
-            # ⚠️ EFEITO DE PISCAR (quanto mais perto do topo, mais rápido pisca)
-            blink_speed = 150  # Começa piscando devagar
-            if self.atomic_bomb_y < 100:  # Quando está próximo do topo
-                blink_speed = 50  # Pisca RÁPIDO (alerta!)
-            blink = (pygame.time.get_ticks() // blink_speed) % 2 == 0
-            
-            # Se não estiver piscando (off), desenha transparente/escuro
-            if not blink and self.atomic_bomb_y < 100:
-                # Míssil pisca quando está perto de explodir!
-                brightness = 0.3  # Escurecido
-            else:
-                brightness = 1.0  # Normal/brilhante
-            
-            # CORPO DO MÍSSIL (retângulo gordo)
-            missile_width = 30  # GORDO!
-            missile_height = 60  # LONGO!
-            missile_x = int(self.atomic_bomb_x - missile_width/2)
-            missile_y = int(self.atomic_bomb_y - missile_height/2)
-            
-            # Corpo principal do míssil (cinza metálico com brightness)
-            body_color = tuple(int(c * brightness) for c in (150, 150, 150))
-            pygame.draw.rect(self.screen, body_color,
-                           (missile_x, missile_y, missile_width, missile_height))
-            
-            # Borda brilhante do míssil (também pisca)
-            border_color = tuple(int(c * brightness) for c in (200, 200, 255))
-            pygame.draw.rect(self.screen, border_color,
-                           (missile_x, missile_y, missile_width, missile_height), 3)
-            
-            # OGIVA (ponta triangular) - PISCA EM VERMELHO BRILHANTE quando perto do topo
-            nose_points = [
-                (int(self.atomic_bomb_x), int(self.atomic_bomb_y - missile_height/2 - 20)),  # Ponta
-                (missile_x, missile_y),  # Esquerda
-                (missile_x + missile_width, missile_y)  # Direita
-            ]
-            if self.atomic_bomb_y < 100 and blink:
-                nose_color = (255, 255, 0)  # AMARELO BRILHANTE (alerta!)
-            else:
-                nose_color = tuple(int(c * brightness) for c in (255, 100, 100))
-            pygame.draw.polygon(self.screen, nose_color, nose_points)
-            pygame.draw.polygon(self.screen, tuple(int(c * brightness) for c in (255, 200, 200)), nose_points, 2)
-            
-            # ALETAS (base do míssil)
-            fin_height = 15
-            fin_y = missile_y + missile_height
-            # Aleta esquerda
-            left_fin = [
-                (missile_x, fin_y),
-                (missile_x - 12, fin_y + fin_height),
-                (missile_x, fin_y + fin_height)
-            ]
-            fin_color = tuple(int(c * brightness) for c in (180, 180, 200))
-            fin_border = tuple(int(c * brightness) for c in (220, 220, 255))
-            pygame.draw.polygon(self.screen, fin_color, left_fin)
-            pygame.draw.polygon(self.screen, fin_border, left_fin, 2)
-            
-            # Aleta direita
-            right_fin = [
-                (missile_x + missile_width, fin_y),
-                (missile_x + missile_width + 12, fin_y + fin_height),
-                (missile_x + missile_width, fin_y + fin_height)
-            ]
-            pygame.draw.polygon(self.screen, fin_color, right_fin)
-            pygame.draw.polygon(self.screen, fin_border, right_fin, 2)
-            
-            # ⚠️ SÍMBOLO DE RADIAÇÃO no centro - PISCA INTENSAMENTE perto do topo!
-            symbol_size = 8 + pulse
-            if self.atomic_bomb_y < 100 and blink:
-                # Quando perto do topo E piscando, símbolo fica VERMELHO BRILHANTE
-                symbol_color = (255, 0, 0)
-                symbol_center = (0, 0, 0)
-            else:
-                # Normal: amarelo
-                symbol_color = tuple(int(c * brightness) for c in (255, 255, 0))
-                symbol_center = tuple(int(c * brightness) for c in (0, 0, 0))
-            
-            pygame.draw.circle(self.screen, symbol_color,
-                             (int(self.atomic_bomb_x), int(self.atomic_bomb_y)),
-                             int(symbol_size))
-            pygame.draw.circle(self.screen, symbol_center,
-                             (int(self.atomic_bomb_x), int(self.atomic_bomb_y)),
-                             int(symbol_size * 0.5))
-            
-            # Faixas de advertência (amarelo e preto) - também piscam
-            stripe_y = missile_y + 15
-            for i in range(3):
-                stripe_y_pos = stripe_y + (i * 15)
-                if i % 2 == 0:
-                    stripe_color = tuple(int(c * brightness) for c in (255, 255, 0))
-                    pygame.draw.rect(self.screen, stripe_color,
-                                   (missile_x + 2, stripe_y_pos, missile_width - 4, 6))
-                else:
-                    stripe_color = tuple(int(c * brightness) for c in (0, 0, 0))
-                    pygame.draw.rect(self.screen, stripe_color,
-                                   (missile_x + 2, stripe_y_pos, missile_width - 4, 6))
-            
-            # PROPULSÃO - Trail de fogo e fumaça (não pisca, sempre ativa)
-            trail_start_y = missile_y + missile_height + fin_height
-            for i in range(20):
-                trail_y = trail_start_y + (i * 8)
-                trail_width = missile_width - (i * 1.2)
-                trail_alpha = 255 - (i * 12)
-                
-                if trail_width > 0 and trail_y < self.height:
-                    # Fogo alaranjado/amarelo
-                    if i < 5:
-                        color = (255, 255 - i*40, 0)  # Amarelo -> Laranja
-                    elif i < 10:
-                        color = (255 - (i-5)*30, 100, 0)  # Laranja -> Vermelho
-                    else:
-                        color = (150 - (i-10)*10, 50, 50)  # Vermelho escuro -> Fumaça
-                    
-                    pygame.draw.ellipse(self.screen, color,
-                                      (int(self.atomic_bomb_x - trail_width/2),
-                                       int(trail_y),
-                                       int(trail_width),
-                                       12))
-            
-            # Partículas de faísca ao redor da propulsão
-            for angle in range(0, 360, 45):
-                rad = math.radians(angle + pygame.time.get_ticks() / 15)
-                spark_distance = 25 + pulse
-                particle_x = self.atomic_bomb_x + math.cos(rad) * spark_distance
-                particle_y = trail_start_y + 10 + math.sin(rad) * spark_distance
-                pygame.draw.circle(self.screen, (255, 255, 100),
-                                 (int(particle_x), int(particle_y)), 3)
+            self.draw_atomic_missile()
         
         # 🎆 DESENHAR EXPLOSÕES ESPETACULARES! 🎆
         self.effects.draw_explosion_particles(self.screen, self.explosion_particles)

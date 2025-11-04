@@ -1,0 +1,26 @@
+{
+  "player": {
+    "base_speed": 5,
+    "invulnerable_duration_frames": 30
+  },
+  "difficulty": {
+    "points_per_level": 5000,
+    "spawn_base_interval": 80,
+    "spawn_min_interval": 15,
+    "spawn_level_reduction_factor": 1.5
+  },
+  "damage": {
+    "enemy_bullet": 5,
+    "terrain_collision": 8,
+    "enemy_collision": 10
+  },
+  "rewards": {
+    "coin_min_per_kill": 2,
+    "coin_max_per_kill": 5,
+    "xp_per_kill": 10,
+    "xp_per_boss": 200
+  },
+  "atomic_bomb": {
+    "damage_to_boss": 30
+  }
+}

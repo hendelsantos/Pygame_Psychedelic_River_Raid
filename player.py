@@ -162,8 +162,15 @@ class Player(pygame.sprite.Sprite):
         rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
         return tuple(int(c * 255) for c in rgb)
 
-    def draw(self, screen):
-        """Desenha o jogador com efeitos psicodélicos"""
+    def draw(self, screen, invulnerable=False):
+        """Desenha o jogador com efeitos psicodélicos e feedback de invulnerabilidade"""
+        # 🛡️ EFEITO DE PISCAR quando invulnerável
+        if invulnerable:
+            # Piscar a cada 4 frames (rápido)
+            if (pygame.time.get_ticks() // 60) % 2 == 0:
+                # Frame par: não desenha nada (invisível)
+                return
+        
         # Desenhar partículas de propulsão primeiro
         self.draw_thrust_particles(screen)
         
