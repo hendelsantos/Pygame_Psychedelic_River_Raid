@@ -139,6 +139,11 @@ class Game:
         self.is_game_over = False
         self.game_over_timer = 0
         
+        # Sistema de invencibilidade temporária
+        self.invulnerable = False
+        self.invulnerable_timer = 0
+        self.invulnerable_duration = 60  # 1 segundo a 60 FPS
+        
         # Iniciar música de fundo (sem print)
         self.audio.start_background_music()
         
@@ -277,6 +282,12 @@ class Game:
         
         # Verificar colisões
         self.check_collisions()
+        
+        # Atualizar sistema de invencibilidade
+        if self.invulnerable:
+            self.invulnerable_timer -= 1
+            if self.invulnerable_timer <= 0:
+                self.invulnerable = False
         
         # ⚛️ ATUALIZAR MÍSSIL ATÔMICO
         if self.atomic_bomb_active:
@@ -758,7 +769,7 @@ class Game:
             self.level_generator.powerups.remove(powerup)
         
         # Verificar colisão com obstáculos do terreno (rochas, cristais, esferas de energia)
-        if self.collision_manager.check_terrain_collision(self.player, self.level_generator):
+        if not self.invulnerable and self.collision_manager.check_terrain_collision(self.player, self.level_generator):
             self.player.take_damage(30)  # Dano por colidir com obstáculo
             # Som de explosão quando jogador bate em obstáculo
             self.audio.play_sound('explosion')
@@ -766,34 +777,42 @@ class Game:
             self.gamepad.rumble(0.8, 0.4, 200)
             # Efeito visual
             self.create_explosion(self.player.rect.center, (255, 100, 100))
+            # Ativar invencibilidade temporária
+            self.invulnerable = True
+            self.invulnerable_timer = self.invulnerable_duration
             if self.player.health <= 0:
                 self.game_over()
         
         # Projéteis inimigos atingindo o jogador
-        hits = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
-        if hits:
-            self.player.take_damage(20)  # Dano padrão
-            # Som de explosão quando jogador é atingido
-            self.audio.play_sound('explosion')
-            # Vibração ao tomar dano
-            self.gamepad.rumble(0.7, 0.3, 150)
-            if self.player.health <= 0:
-                self.game_over()
+        if not self.invulnerable:
+            hits = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
+            if hits:
+                self.player.take_damage(20)  # Dano padrão
+                # Som de explosão quando jogador é atingido
+                self.audio.play_sound('explosion')
+                # Vibração ao tomar dano
+                self.gamepad.rumble(0.7, 0.3, 150)
+                # Ativar invencibilidade temporária
+                self.invulnerable = True
+                self.invulnerable_timer = self.invulnerable_duration
+                if self.player.health <= 0:
+                    self.game_over()
         
         # Inimigos colidindo com o jogador
-        hits = pygame.sprite.spritecollide(self.player, self.enemies, True)
-        if hits:
-            self.player.take_damage(30)  # Dano maior por colisão
-            self.audio.play_sound('explosion')
-            # Vibração ao colidir com inimigo
-            self.gamepad.rumble(0.8, 0.4, 200)
-            if self.player.health <= 0:
-                self.game_over()
-        if hits:
-            self.player.take_damage(30)  # Dano maior por colisão
-            self.enemies_killed += len(hits)
-            # Som de explosão grande quando colide com inimigo
-            self.audio.play_sound('explosion')
+        if not self.invulnerable:
+            hits = pygame.sprite.spritecollide(self.player, self.enemies, True)
+            if hits:
+                self.player.take_damage(30)  # Dano maior por colisão
+                self.enemies_killed += len(hits)
+                # Som de explosão grande quando colide com inimigo
+                self.audio.play_sound('explosion')
+                # Vibração ao colidir com inimigo
+                self.gamepad.rumble(0.8, 0.4, 200)
+                # Ativar invencibilidade temporária
+                self.invulnerable = True
+                self.invulnerable_timer = self.invulnerable_duration
+                if self.player.health <= 0:
+                    self.game_over()
             self.create_explosion(self.player.rect.center, (255, 0, 0))
             if self.player.health <= 0:
                 self.game_over()
