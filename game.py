@@ -63,8 +63,8 @@ class Game:
         # Inicializar componentes do jogo
         self.player = Player(width // 2, height - 100)
         
-        # Aplicar vidas iniciais baseado no modo
-        self.player.max_health = self.mode_manager.get_starting_lives() * 100
+        # Aplicar vidas iniciais baseado no modo (AUMENTADO PARA MAIS BALANCEADO)
+        self.player.max_health = self.mode_manager.get_starting_lives() * 100  # Era 3 vidas de 100 = 300
         self.player.health = self.player.max_health
         
         self.level_generator = LevelGenerator(width, height)
@@ -139,10 +139,13 @@ class Game:
         self.is_game_over = False
         self.game_over_timer = 0
         
-        # Sistema de invencibilidade temporária
+        # Sistema de invencibilidade temporária (BALANCEADO - 0.5s)
         self.invulnerable = False
         self.invulnerable_timer = 0
-        self.invulnerable_duration = 60  # 1 segundo a 60 FPS
+        self.invulnerable_duration = 30  # 0.5 segundo a 60 FPS (era 60 = 1s)
+        
+    # Sistema de invencibilidade desabilitado
+    # (removido)
         
         # Iniciar música de fundo (sem print)
         self.audio.start_background_music()
@@ -283,11 +286,13 @@ class Game:
         # Verificar colisões
         self.check_collisions()
         
-        # Atualizar sistema de invencibilidade
+        # Atualizar sistema de invencibilidade (BALANCEADO)
         if self.invulnerable:
             self.invulnerable_timer -= 1
             if self.invulnerable_timer <= 0:
                 self.invulnerable = False
+        
+        # Invencibilidade desabilitada
         
         # ⚛️ ATUALIZAR MÍSSIL ATÔMICO
         if self.atomic_bomb_active:
@@ -770,14 +775,14 @@ class Game:
         
         # Verificar colisão com obstáculos do terreno (rochas, cristais, esferas de energia)
         if not self.invulnerable and self.collision_manager.check_terrain_collision(self.player, self.level_generator):
-            self.player.take_damage(30)  # Dano por colidir com obstáculo
+            self.player.take_damage(8)  # Dano REDUZIDO (era 30)
             # Som de explosão quando jogador bate em obstáculo
             self.audio.play_sound('explosion')
             # Vibração ao colidir
             self.gamepad.rumble(0.8, 0.4, 200)
             # Efeito visual
             self.create_explosion(self.player.rect.center, (255, 100, 100))
-            # Ativar invencibilidade temporária
+            # Invencibilidade temporária balanceada
             self.invulnerable = True
             self.invulnerable_timer = self.invulnerable_duration
             if self.player.health <= 0:
@@ -787,12 +792,12 @@ class Game:
         if not self.invulnerable:
             hits = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
             if hits:
-                self.player.take_damage(20)  # Dano padrão
+                self.player.take_damage(5)  # Dano REDUZIDO (era 20)
                 # Som de explosão quando jogador é atingido
                 self.audio.play_sound('explosion')
                 # Vibração ao tomar dano
                 self.gamepad.rumble(0.7, 0.3, 150)
-                # Ativar invencibilidade temporária
+                # Invencibilidade temporária balanceada
                 self.invulnerable = True
                 self.invulnerable_timer = self.invulnerable_duration
                 if self.player.health <= 0:
@@ -802,20 +807,18 @@ class Game:
         if not self.invulnerable:
             hits = pygame.sprite.spritecollide(self.player, self.enemies, True)
             if hits:
-                self.player.take_damage(30)  # Dano maior por colisão
+                self.player.take_damage(10)  # Dano REDUZIDO (era 30)
                 self.enemies_killed += len(hits)
                 # Som de explosão grande quando colide com inimigo
                 self.audio.play_sound('explosion')
                 # Vibração ao colidir com inimigo
                 self.gamepad.rumble(0.8, 0.4, 200)
-                # Ativar invencibilidade temporária
+                self.create_explosion(self.player.rect.center, (255, 0, 0))
+                # Invencibilidade temporária balanceada
                 self.invulnerable = True
                 self.invulnerable_timer = self.invulnerable_duration
                 if self.player.health <= 0:
                     self.game_over()
-            self.create_explosion(self.player.rect.center, (255, 0, 0))
-            if self.player.health <= 0:
-                self.game_over()
     
     def trigger_atomic_explosion(self):
         """⚛️ EXPLOSÃO ATÔMICA ÉPICA - Destrói TODOS os inimigos na tela! (NÃO causa dano ao jogador)"""
