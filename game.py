@@ -757,6 +757,18 @@ class Game:
             powerup['collected'] = True
             self.level_generator.powerups.remove(powerup)
         
+        # Verificar colisão com obstáculos do terreno (rochas, cristais, esferas de energia)
+        if self.collision_manager.check_terrain_collision(self.player, self.level_generator):
+            self.player.take_damage(30)  # Dano por colidir com obstáculo
+            # Som de explosão quando jogador bate em obstáculo
+            self.audio.play_sound('explosion')
+            # Vibração ao colidir
+            self.gamepad.rumble(0.8, 0.4, 200)
+            # Efeito visual
+            self.create_explosion(self.player.rect.center, (255, 100, 100))
+            if self.player.health <= 0:
+                self.game_over()
+        
         # Projéteis inimigos atingindo o jogador
         hits = pygame.sprite.spritecollide(self.player, self.enemy_bullets, True)
         if hits:
