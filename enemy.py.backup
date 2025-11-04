@@ -729,7 +729,6 @@ class Enemy(pygame.sprite.Sprite):
         
         # Contorno
         pygame.draw.polygon(screen, (100, 200, 255), points, 2)
-
     def draw_giant(self, screen):
         """Desenhar inimigo GIGANTE - Grande e ameaçador"""
         # Atualizar animação
