@@ -1,6 +1,7 @@
 import pygame
 import random
 import math
+import colorsys
 
 class LevelGenerator:
     def __init__(self, width, height):
@@ -196,7 +197,6 @@ class LevelGenerator:
     
     def draw_terrain(self, screen, color_shift):
         """Desenhar terreno das paredes"""
-        import colorsys
         
         # Desenhar paredes laterais
         if len(self.left_wall) > 1:
@@ -239,67 +239,81 @@ class LevelGenerator:
     
     def draw_obstacles(self, screen, color_shift):
         """Desenhar obstáculos"""
-        import colorsys
         
         for obstacle in self.obstacles:
             obstacle['rotation'] += obstacle['rotation_speed']
             
-            # Cor baseada no tipo
             if obstacle['type'] == 'rock':
+                # Desenhar rocha (círculo)
                 hue = (color_shift + 0.1) % 1.0
-            elif obstacle['type'] == 'crystal':
-                hue = (color_shift + 0.6) % 1.0
-            else:  # energy_field
-                hue = (color_shift + 0.9) % 1.0
-            
-            # Pulsar
-            pulse = math.sin(pygame.time.get_ticks() * 0.005 + obstacle['pulse_phase'])
-            size = obstacle['size'] * (1 + 0.2 * pulse)
-            brightness = 0.7 + 0.3 * pulse
-            
-            rgb = colorsys.hsv_to_rgb(hue, 1.0, brightness)
-            color = tuple(int(c * 255) for c in rgb)
-            
-            # Desenhar baseado no tipo
-            if obstacle['type'] == 'rock':
-                # Octágono rotacionado
-                points = []
-                for i in range(8):
-                    angle = obstacle['rotation'] + (i / 8) * 2 * math.pi
-                    x = obstacle['x'] + size * 0.5 * math.cos(angle)
-                    y = obstacle['y'] + size * 0.5 * math.sin(angle)
-                    points.append((x, y))
-                
-                pygame.draw.polygon(screen, color, points)
-                
-            elif obstacle['type'] == 'crystal':
-                # Diamante
-                points = [
-                    (obstacle['x'], obstacle['y'] - size * 0.6),
-                    (obstacle['x'] + size * 0.4, obstacle['y']),
-                    (obstacle['x'], obstacle['y'] + size * 0.6),
-                    (obstacle['x'] - size * 0.4, obstacle['y'])
-                ]
-                
-                pygame.draw.polygon(screen, color, points)
-                pygame.draw.polygon(screen, (255, 255, 255), points, 2)
-                
-            else:  # energy_field
-                # Círculo pulsante com anéis
-                pygame.draw.circle(screen, color, 
+                color = colorsys.hsv_to_rgb(hue, 0.7, 0.8)
+                color = (int(c * 255) for c in color)
+                pygame.draw.circle(screen, tuple(color), 
                                  (int(obstacle['x']), int(obstacle['y'])), 
-                                 int(size * 0.5))
-                
-                for ring in range(3):
-                    ring_radius = int(size * 0.3 * (ring + 1))
-                    ring_color = [int(c * (1 - ring * 0.3)) for c in color]
-                    pygame.draw.circle(screen, ring_color,
-                                     (int(obstacle['x']), int(obstacle['y'])),
-                                     ring_radius, 2)
+                                 obstacle['size'])
+            
+            elif obstacle['type'] == 'crystal':
+                # Desenhar cristal (polígono)
+                self.draw_crystal(screen, obstacle, color_shift)
+            
+            elif obstacle['type'] == 'energy_field':
+                # Desenhar campo de energia (esfera pulsante)
+                self.draw_energy_field(screen, obstacle, color_shift)
+
+    def draw_crystal(self, screen, obstacle, color_shift):
+        """Desenhar obstáculo de cristal"""
+        points = []
+        size = obstacle['size']
+        x, y = obstacle['x'], obstacle['y']
+        rotation = obstacle['rotation']
+        
+        for i in range(6):
+            angle = math.radians(60 * i + rotation)
+            px = x + size * math.cos(angle)
+            py = y + size * math.sin(angle)
+            points.append((px, py))
+            
+        hue = (color_shift + 0.6) % 1.0
+        color = colorsys.hsv_to_rgb(hue, 0.8, 1.0)
+        color = (int(color[0] * 255), int(color[1] * 255), int(color[2] * 255))
+        
+        pygame.draw.polygon(screen, color, points)
+        pygame.draw.polygon(screen, (255, 255, 255), points, 2)
+
+    def draw_energy_field(self, screen, obstacle, color_shift):
+        """Desenhar obstáculo de campo de energia"""
+        x, y = obstacle['x'], obstacle['y']
+        size = obstacle['size']
+        pulse_phase = obstacle['pulse_phase']
+        
+        # Efeito de pulsação
+        pulse = (math.sin(pygame.time.get_ticks() * 0.005 + pulse_phase) + 1) / 2  # Varia de 0 a 1
+        current_radius = max(10, int(size * (0.8 + pulse * 0.4)))  # Garantir mínimo de 10
+        
+        # Cor base
+        hue = (color_shift + 0.3) % 1.0
+        base_color = colorsys.hsv_to_rgb(hue, 0.9, 1.0)
+        base_color = (int(base_color[0] * 255), int(base_color[1] * 255), int(base_color[2] * 255))
+
+        # Círculo interno (sólido)
+        center_color = (255, 255, 255)
+        inner_radius = max(5, int(current_radius * 0.5))  # Garantir mínimo de 5
+        pygame.draw.circle(screen, center_color, (int(x), int(y)), inner_radius)
+
+        # Círculo externo (transparente) - com proteção contra valores inválidos
+        if current_radius > 0:
+            try:
+                surface_size = max(4, current_radius * 2)  # Mínimo de 4x4 pixels
+                surface = pygame.Surface((surface_size, surface_size), pygame.SRCALPHA)
+                alpha = 100 + int(pulse * 100)
+                pygame.draw.circle(surface, (*base_color, alpha), (current_radius, current_radius), current_radius)
+                screen.blit(surface, (int(x - current_radius), int(y - current_radius)))
+            except (ValueError, pygame.error) as e:
+                # Se falhar, desenha apenas um círculo simples
+                pygame.draw.circle(screen, base_color, (int(x), int(y)), current_radius, 2)
     
     def draw_powerups(self, screen, color_shift):
         """Desenhar power-ups"""
-        import colorsys
         
         for powerup in self.powerups:
             if not powerup['collected']:
